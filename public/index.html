@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Sale Forces CRM - Customer Relationship Management System"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Tailwind CSS CDN (for development) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Configure Tailwind -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                50: "#eff6ff",
+                100: "#dbeafe",
+                200: "#bfdbfe",
+                300: "#93c5fd",
+                400: "#60a5fa",
+                500: "#3b82f6",
+                600: "#2563eb",
+                700: "#1d4ed8",
+                800: "#1e40af",
+                900: "#1e3a8a",
+              },
+              secondary: {
+                50: "#f8fafc",
+                100: "#f1f5f9",
+                200: "#e2e8f0",
+                300: "#cbd5e1",
+                400: "#94a3b8",
+                500: "#64748b",
+                600: "#475569",
+                700: "#334155",
+                800: "#1e293b",
+                900: "#0f172a",
+              },
+            },
+            fontFamily: {
+              sans: ["Inter", "system-ui", "sans-serif"],
+            },
+            boxShadow: {
+              card: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+              "card-hover":
+                "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+            },
+            animation: {
+              "fade-in": "fadeIn 0.5s ease-in-out",
+              "slide-in": "slideIn 0.3s ease-out",
+            },
+            keyframes: {
+              fadeIn: {
+                "0%": { opacity: "0" },
+                "100%": { opacity: "1" },
+              },
+              slideIn: {
+                "0%": { transform: "translateY(-10px)", opacity: "0" },
+                "100%": { transform: "translateY(0)", opacity: "1" },
+              },
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>Sale Forces CRM</title>
+
+    <style>
+      /* Loading spinner */
+      .loading-spinner {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Initial loading state */
+      .initial-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+
+      /* Hide scrollbar during loading */
+      .loading body {
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 font-sans">
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+
+    <!-- Initial Loading Screen -->
+    <div id="initial-loading" class="initial-loading">
+      <div class="loading-spinner"></div>
+      <h2 class="mt-4 text-xl font-semibold text-gray-700">
+        Loading Sale Forces CRM...
+      </h2>
+      <p class="mt-2 text-sm text-gray-500">
+        Please wait while we set up your workspace
+      </p>
+    </div>
+
+    <!-- React Root -->
+    <div id="root"></div>
+
+    <!-- Remove loading screen when React loads -->
+    <script>
+      // Remove loading screen when React has loaded
+      window.addEventListener("load", function () {
+        setTimeout(function () {
+          const loading = document.getElementById("initial-loading");
+          if (loading) {
+            loading.style.opacity = "0";
+            loading.style.transition = "opacity 0.5s ease";
+            setTimeout(() => {
+              loading.remove();
+            }, 500);
+          }
+        }, 1000); // Show loading for at least 1 second
+      });
+
+      // Fallback: Remove loading after 10 seconds regardless
+      setTimeout(function () {
+        const loading = document.getElementById("initial-loading");
+        if (loading) {
+          loading.remove();
+        }
+      }, 10000);
+    </script>
+  </body>
+</html>
