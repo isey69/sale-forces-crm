@@ -1,12 +1,12 @@
 import React, { useState, useRef } from "react";
-import { useCustomers } from "../../context/CustomerContext";
+import { useCustomerContext } from "../../context/CustomerContext";
 import { parseCSV, downloadCSVTemplate } from "../../utils/csvParser";
 import Button from "../common/Button";
 import Modal from "../common/Modal";
 import { Select } from "../common/Input";
 
 const CSVImport = ({ isOpen, onClose, onSuccess }) => {
-  const { importCustomers } = useCustomers();
+  const { importCustomers } = useCustomerContext();
   const fileInputRef = useRef(null);
 
   const [step, setStep] = useState(1); // 1: Upload, 2: Preview, 3: Results

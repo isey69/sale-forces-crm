@@ -1,257 +1,212 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import customerService from "../services/customerService";
+import React, { createContext, useContext, useReducer, useEffect } from "react";
+import { customerService } from "../services/customerService";
+import toast from "react-hot-toast";
 
-const CustomerContext = createContext({});
+// Customer Context
+const CustomerContext = createContext();
 
-export const useCustomers = () => {
-  const context = useContext(CustomerContext);
-  if (!context) {
-    throw new Error("useCustomers must be used within a CustomerProvider");
+// Customer state reducer
+const customerReducer = (state, action) => {
+  switch (action.type) {
+    case "SET_LOADING":
+      return { ...state, loading: action.payload };
+    case "SET_ERROR":
+      return { ...state, error: action.payload, loading: false };
+    case "SET_CUSTOMERS":
+      return {
+        ...state,
+        customers: action.payload,
+        loading: false,
+        error: null,
+      };
+    case "ADD_CUSTOMER":
+      return { ...state, customers: [action.payload, ...state.customers] };
+    case "UPDATE_CUSTOMER":
+      return {
+        ...state,
+        customers: state.customers.map((customer) =>
+          customer.id === action.payload.id
+            ? { ...customer, ...action.payload }
+            : customer
+        ),
+      };
+    case "DELETE_CUSTOMER":
+      return {
+        ...state,
+        customers: state.customers.filter(
+          (customer) => customer.id !== action.payload
+        ),
+      };
+    case "SET_FILTER":
+      return { ...state, filter: action.payload };
+    case "SET_SEARCH_TERM":
+      return { ...state, searchTerm: action.payload };
+    default:
+      return state;
   }
-  return context;
 };
 
+// Initial state
+const initialState = {
+  customers: [],
+  loading: true,
+  error: null,
+  filter: "all", // all, cpa, noncpa
+  searchTerm: "",
+};
+
+// Customer Provider
 export const CustomerProvider = ({ children }) => {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({
-    type: "all", // 'all', 'CPA', 'NonCPA'
-    search: "",
-    sortBy: "name", // 'name', 'createdAt', 'updatedAt'
-  });
+  const [state, dispatch] = useReducer(customerReducer, initialState);
 
   // Load all customers
   const loadCustomers = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      const fetchedCustomers = await customerService.getAllCustomers();
-      setCustomers(fetchedCustomers);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      dispatch({ type: "SET_LOADING", payload: true });
+      const customers = await customerService.getAllCustomers();
+      dispatch({ type: "SET_CUSTOMERS", payload: customers });
+    } catch (error) {
+      dispatch({ type: "SET_ERROR", payload: error.message });
+      toast.error("Failed to load customers");
     }
   };
 
-  // Get filtered customers
-  const getFilteredCustomers = () => {
-    let filtered = [...customers];
-
-    // Filter by type
-    if (filters.type !== "all") {
-      filtered = filtered.filter((customer) => customer.type === filters.type);
-    }
-
-    // Filter by search
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(
-        (customer) =>
-          customer.name.toLowerCase().includes(searchTerm) ||
-          customer.surname.toLowerCase().includes(searchTerm) ||
-          customer.email?.toLowerCase().includes(searchTerm) ||
-          customer.cpaNumber?.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      switch (filters.sortBy) {
-        case "name":
-          return `${a.name} ${a.surname}`.localeCompare(
-            `${b.name} ${b.surname}`
-          );
-        case "createdAt":
-          return (
-            new Date(b.createdAt?.toDate?.() || b.createdAt) -
-            new Date(a.createdAt?.toDate?.() || a.createdAt)
-          );
-        case "updatedAt":
-          return (
-            new Date(b.updatedAt?.toDate?.() || b.updatedAt) -
-            new Date(a.updatedAt?.toDate?.() || a.updatedAt)
-          );
-        default:
-          return 0;
-      }
-    });
-
-    return filtered;
-  };
-
-  // Create customer
-  const createCustomer = async (customerData) => {
+  // Add customer
+  const addCustomer = async (customerData) => {
     try {
-      setError(null);
-      const newCustomer = await customerService.createCustomer(customerData);
-      setCustomers((prev) => [...prev, newCustomer]);
+      const newCustomer = await customerService.addCustomer(customerData);
+      dispatch({ type: "ADD_CUSTOMER", payload: newCustomer });
+      toast.success("Customer added successfully");
       return newCustomer;
-    } catch (err) {
-      setError(err.message);
-      throw err;
+    } catch (error) {
+      toast.error("Failed to add customer");
+      throw error;
     }
   };
 
   // Update customer
-  const updateCustomer = async (id, updates) => {
+  const updateCustomer = async (customerId, updates) => {
     try {
-      setError(null);
-      const updatedCustomer = await customerService.updateCustomer(id, updates);
-      setCustomers((prev) =>
-        prev.map((customer) =>
-          customer.id === id ? updatedCustomer : customer
-        )
+      const updatedCustomer = await customerService.updateCustomer(
+        customerId,
+        updates
       );
+      dispatch({
+        type: "UPDATE_CUSTOMER",
+        payload: { id: customerId, ...updatedCustomer },
+      });
+      toast.success("Customer updated successfully");
       return updatedCustomer;
-    } catch (err) {
-      setError(err.message);
-      throw err;
+    } catch (error) {
+      toast.error("Failed to update customer");
+      throw error;
     }
   };
 
   // Delete customer
-  const deleteCustomer = async (id) => {
+  const deleteCustomer = async (customerId) => {
     try {
-      setError(null);
-      await customerService.deleteCustomer(id);
-      setCustomers((prev) => prev.filter((customer) => customer.id !== id));
-      return true;
-    } catch (err) {
-      setError(err.message);
-      throw err;
+      await customerService.deleteCustomer(customerId);
+      dispatch({ type: "DELETE_CUSTOMER", payload: customerId });
+      toast.success("Customer deleted successfully");
+    } catch (error) {
+      toast.error("Failed to delete customer");
+      throw error;
     }
   };
 
-  // Add relationship
-  const addRelationship = async (customerId1, customerId2) => {
+  // Search customers
+  const searchCustomers = async (searchTerm) => {
     try {
-      setError(null);
-      await customerService.addRelationship(customerId1, customerId2);
+      dispatch({ type: "SET_LOADING", payload: true });
+      dispatch({ type: "SET_SEARCH_TERM", payload: searchTerm });
 
-      // Update local state
-      setCustomers((prev) =>
-        prev.map((customer) => {
-          if (customer.id === customerId1) {
-            return {
-              ...customer,
-              relationships: [...(customer.relationships || []), customerId2],
-            };
-          }
-          if (customer.id === customerId2) {
-            return {
-              ...customer,
-              relationships: [...(customer.relationships || []), customerId1],
-            };
-          }
-          return customer;
-        })
-      );
-
-      return true;
-    } catch (err) {
-      setError(err.message);
-      throw err;
+      if (searchTerm.trim() === "") {
+        await loadCustomers();
+      } else {
+        const searchResults = await customerService.searchCustomers(searchTerm);
+        dispatch({ type: "SET_CUSTOMERS", payload: searchResults });
+      }
+    } catch (error) {
+      dispatch({ type: "SET_ERROR", payload: error.message });
+      toast.error("Failed to search customers");
     }
   };
 
-  // Remove relationship
-  const removeRelationship = async (customerId1, customerId2) => {
+  // Filter customers by type
+  const filterCustomersByType = async (type) => {
     try {
-      setError(null);
-      await customerService.removeRelationship(customerId1, customerId2);
+      dispatch({ type: "SET_LOADING", payload: true });
+      dispatch({ type: "SET_FILTER", payload: type });
 
-      // Update local state
-      setCustomers((prev) =>
-        prev.map((customer) => {
-          if (customer.id === customerId1) {
-            return {
-              ...customer,
-              relationships: (customer.relationships || []).filter(
-                (id) => id !== customerId2
-              ),
-            };
-          }
-          if (customer.id === customerId2) {
-            return {
-              ...customer,
-              relationships: (customer.relationships || []).filter(
-                (id) => id !== customerId1
-              ),
-            };
-          }
-          return customer;
-        })
-      );
-
-      return true;
-    } catch (err) {
-      setError(err.message);
-      throw err;
+      if (type === "all") {
+        await loadCustomers();
+      } else {
+        const filteredCustomers = await customerService.getCustomersByType(
+          type.toUpperCase()
+        );
+        dispatch({ type: "SET_CUSTOMERS", payload: filteredCustomers });
+      }
+    } catch (error) {
+      dispatch({ type: "SET_ERROR", payload: error.message });
+      toast.error("Failed to filter customers");
     }
-  };
-
-  // Get related customers for a specific customer
-  const getRelatedCustomers = (customerId) => {
-    const customer = customers.find((c) => c.id === customerId);
-    if (!customer || !customer.relationships) return [];
-
-    return customers.filter((c) => customer.relationships.includes(c.id));
   };
 
   // Import customers from CSV
-  const importCustomers = async (customersData) => {
+  const importCustomersFromCSV = async (customersData) => {
     try {
-      setError(null);
-      setLoading(true);
-      const results = await customerService.bulkImportCustomers(customersData);
+      const results = await customerService.importCustomersFromCSV(
+        customersData
+      );
 
-      // Add successfully imported customers to state
-      if (results.imported.length > 0) {
-        setCustomers((prev) => [...prev, ...results.imported]);
+      const imported = results.filter((r) => r.status === "imported").length;
+      const skipped = results.filter((r) => r.status === "skipped").length;
+
+      if (imported > 0) {
+        toast.success(
+          `${imported} customers imported successfully${
+            skipped > 0 ? `, ${skipped} skipped` : ""
+          }`
+        );
+        await loadCustomers(); // Reload to show new customers
+      } else {
+        toast.error("No customers were imported");
       }
 
       return results;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      toast.error("Failed to import customers");
+      throw error;
     }
   };
 
-  // Update filters
-  const updateFilters = (newFilters) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }));
+  // Get customer statistics
+  const getCustomerStats = () => {
+    const { customers } = state;
+    return {
+      total: customers.length,
+      cpa: customers.filter((c) => c.type === "CPA").length,
+      noncpa: customers.filter((c) => c.type === "NonCPA").length,
+      withMeetings: customers.filter((c) => c.lastMeeting).length,
+    };
   };
 
-  // Clear error
-  const clearError = () => {
-    setError(null);
-  };
-
-  // Load customers on mount
+  // Initial load
   useEffect(() => {
     loadCustomers();
   }, []);
 
   const value = {
-    customers,
-    filteredCustomers: getFilteredCustomers(),
-    loading,
-    error,
-    filters,
+    ...state,
     loadCustomers,
-    createCustomer,
+    addCustomer,
     updateCustomer,
     deleteCustomer,
-    addRelationship,
-    removeRelationship,
-    getRelatedCustomers,
-    importCustomers,
-    updateFilters,
-    clearError,
+    searchCustomers,
+    filterCustomersByType,
+    importCustomersFromCSV,
+    getCustomerStats,
   };
 
   return (
@@ -259,4 +214,15 @@ export const CustomerProvider = ({ children }) => {
       {children}
     </CustomerContext.Provider>
   );
+};
+
+// Custom hook to use customer context
+export const useCustomerContext = () => {
+  const context = useContext(CustomerContext);
+  if (!context) {
+    throw new Error(
+      "useCustomerContext must be used within a CustomerProvider"
+    );
+  }
+  return context;
 };

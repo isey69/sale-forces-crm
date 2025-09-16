@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNotes } from "../../context/NotesContext";
-import { useCustomers } from "../../context/CustomerContext";
+import { useCustomerContext } from "../../context/CustomerContext";
 import { useMeetings } from "../../context/MeetingContext";
 import { useAuth } from "../../context/AuthContext";
 import Input, { Select, Textarea } from "../common/Input";
@@ -15,7 +15,7 @@ const NoteForm = ({
   prefilledData = null,
 }) => {
   const { createNote, updateNote, tags } = useNotes();
-  const { customers } = useCustomers();
+  const { customers } = useCustomerContext();
   const { meetings } = useMeetings();
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);

@@ -20,7 +20,7 @@ import CustomFields from "./pages/CustomFields";
 import MeetingCategories from "./pages/MeetingCategories";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
-
+import CustomerDetail from "./components/customers/CustomerDetail";
 function App() {
   console.log("App component rendering");
   return (
@@ -66,6 +66,7 @@ function AuthenticatedApp() {
             <Route path="/custom-fields" element={<CustomFields />} />
             <Route path="/meeting-categories" element={<MeetingCategories />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/customers/:customerId" element={<CustomerDetail />} />
           </Routes>
         </main>
       </div>

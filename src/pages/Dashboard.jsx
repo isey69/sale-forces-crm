@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useCustomers } from "../context/CustomerContext";
+import { useCustomerContext } from "../context/CustomerContext";
 import Button from "../components/common/Button";
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
-  const { customers, loading } = useCustomers();
+  const { customers, loading } = useCustomerContext();
   const [stats, setStats] = useState({
     totalCustomers: 0,
     cpaCustomers: 0,

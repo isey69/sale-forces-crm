@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useMeetings } from "../../context/MeetingContext";
-import { useCustomers } from "../../context/CustomerContext";
+import { useCustomerContext } from "../../context/CustomerContext";
 import Input, { Select, Textarea } from "../common/Input";
 import Button from "../common/Button";
 import Modal from "../common/Modal";
 
 const MeetingForm = ({ isOpen, onClose, meeting = null, onSuccess }) => {
   const { createMeeting, updateMeeting, categories } = useMeetings();
-  const { customers } = useCustomers();
+  const { customers } = useCustomerContext();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({

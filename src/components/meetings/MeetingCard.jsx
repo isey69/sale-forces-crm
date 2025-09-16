@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useMeetings } from "../../context/MeetingContext";
-import { useCustomers } from "../../context/CustomerContext";
+import { useCustomerContext } from "../../context/CustomerContext";
 import Button from "../common/Button";
 import Modal, { ConfirmModal } from "../common/Modal";
 import { Textarea } from "../common/Input";
@@ -8,7 +8,7 @@ import { Textarea } from "../common/Input";
 const MeetingCard = ({ meeting, onEdit, compact = false }) => {
   const { updateMeetingStatus, addMeetingNotes, deleteMeeting, categories } =
     useMeetings();
-  const { customers } = useCustomers();
+  const { customers } = useCustomerContext();
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);

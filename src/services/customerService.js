@@ -1,125 +1,103 @@
 import {
   collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
   doc,
   getDocs,
   getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
   query,
-  where,
   orderBy,
-  arrayUnion,
-  arrayRemove,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-const COLLECTION_NAME = "customers";
+const CUSTOMERS_COLLECTION = "customers";
+const RELATIONSHIPS_COLLECTION = "customer_relationships";
 
-// Customer data structure:
-// {
-//   id: string,
-//   type: 'CPA' | 'NonCPA',
-//   cpaNumber?: string, // Only for CPA
-//   title: string,
-//   name: string,
-//   surname: string,
-//   email?: string,
-//   phone?: string,
-//   customFields: object,
-//   relationships: array of customer IDs,
-//   createdAt: timestamp,
-//   updatedAt: timestamp
-// }
-
+// Customer CRUD Operations
 export const customerService = {
   // Get all customers
   async getAllCustomers() {
     try {
-      const querySnapshot = await getDocs(
-        query(collection(db, COLLECTION_NAME), orderBy("name"))
-      );
-      return querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const customersRef = collection(db, CUSTOMERS_COLLECTION);
+      const q = query(customersRef, orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+
+      const customers = [];
+      querySnapshot.forEach((doc) => {
+        customers.push({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
+          lastActivity:
+            doc.data().lastActivity?.toDate?.() || doc.data().lastActivity,
+        });
+      });
+
+      return customers;
     } catch (error) {
       console.error("Error fetching customers:", error);
       throw error;
     }
   },
 
-  // Get customers by type
-  async getCustomersByType(type) {
+  // Get customer by ID
+  async getCustomerById(customerId) {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where("type", "==", type),
-        orderBy("name")
-      );
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-    } catch (error) {
-      console.error("Error fetching customers by type:", error);
-      throw error;
-    }
-  },
+      const customerRef = doc(db, CUSTOMERS_COLLECTION, customerId);
+      const customerDoc = await getDoc(customerRef);
 
-  // Get single customer
-  async getCustomer(id) {
-    try {
-      const docRef = doc(db, COLLECTION_NAME, id);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        return {
-          id: docSnap.id,
-          ...docSnap.data(),
-        };
-      } else {
+      if (!customerDoc.exists()) {
         throw new Error("Customer not found");
       }
+
+      const customerData = customerDoc.data();
+      return {
+        id: customerDoc.id,
+        ...customerData,
+        createdAt: customerData.createdAt?.toDate?.() || customerData.createdAt,
+        lastActivity:
+          customerData.lastActivity?.toDate?.() || customerData.lastActivity,
+      };
     } catch (error) {
       console.error("Error fetching customer:", error);
       throw error;
     }
   },
 
-  // Create new customer
-  async createCustomer(customerData) {
+  // Add new customer
+  async addCustomer(customerData) {
     try {
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      const customersRef = collection(db, CUSTOMERS_COLLECTION);
+      const newCustomer = {
         ...customerData,
-        relationships: customerData.relationships || [],
-        customFields: customerData.customFields || {},
         createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      return {
-        id: docRef.id,
-        ...customerData,
+        lastActivity: new Date(),
+        relationships: [],
+        customFields: customerData.customFields || {},
       };
+
+      const docRef = await addDoc(customersRef, newCustomer);
+      return { id: docRef.id, ...newCustomer };
     } catch (error) {
-      console.error("Error creating customer:", error);
+      console.error("Error adding customer:", error);
       throw error;
     }
   },
 
   // Update customer
-  async updateCustomer(id, updates) {
+  async updateCustomer(customerId, updates) {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
-      await updateDoc(docRef, {
+      const customerRef = doc(db, CUSTOMERS_COLLECTION, customerId);
+      const updateData = {
         ...updates,
-        updatedAt: new Date(),
-      });
+        lastActivity: new Date(),
+      };
 
-      return await this.getCustomer(id);
+      await updateDoc(customerRef, updateData);
+      return { id: customerId, ...updateData };
     } catch (error) {
       console.error("Error updating customer:", error);
       throw error;
@@ -127,14 +105,13 @@ export const customerService = {
   },
 
   // Delete customer
-  async deleteCustomer(id) {
+  async deleteCustomer(customerId) {
     try {
-      // First, remove this customer from all relationships
-      await this.removeFromAllRelationships(id);
+      const customerRef = doc(db, CUSTOMERS_COLLECTION, customerId);
+      await deleteDoc(customerRef);
 
-      // Then delete the customer
-      const docRef = doc(db, COLLECTION_NAME, id);
-      await deleteDoc(docRef);
+      // Also remove all relationships
+      await this.removeAllCustomerRelationships(customerId);
 
       return true;
     } catch (error) {
@@ -143,175 +120,273 @@ export const customerService = {
     }
   },
 
-  // Add relationship between customers (bidirectional)
-  async addRelationship(customerId1, customerId2) {
+  // Get customers by type
+  async getCustomersByType(type) {
     try {
-      const batch = writeBatch(db);
+      const customersRef = collection(db, CUSTOMERS_COLLECTION);
+      const q = query(
+        customersRef,
+        where("type", "==", type),
+        orderBy("createdAt", "desc")
+      );
+      const querySnapshot = await getDocs(q);
 
-      const customer1Ref = doc(db, COLLECTION_NAME, customerId1);
-      const customer2Ref = doc(db, COLLECTION_NAME, customerId2);
-
-      batch.update(customer1Ref, {
-        relationships: arrayUnion(customerId2),
-        updatedAt: new Date(),
+      const customers = [];
+      querySnapshot.forEach((doc) => {
+        customers.push({
+          id: doc.id,
+          ...doc.data(),
+        });
       });
 
-      batch.update(customer2Ref, {
-        relationships: arrayUnion(customerId1),
-        updatedAt: new Date(),
+      return customers;
+    } catch (error) {
+      console.error("Error fetching customers by type:", error);
+      throw error;
+    }
+  },
+
+  // Search customers
+  async searchCustomers(searchTerm) {
+    try {
+      const customers = await this.getAllCustomers();
+
+      const filtered = customers.filter((customer) => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          customer.name?.toLowerCase().includes(searchLower) ||
+          customer.surname?.toLowerCase().includes(searchLower) ||
+          customer.email?.toLowerCase().includes(searchLower) ||
+          customer.cpaNumber?.toLowerCase().includes(searchLower) ||
+          `${customer.name} ${customer.surname}`
+            .toLowerCase()
+            .includes(searchLower)
+        );
+      });
+
+      return filtered;
+    } catch (error) {
+      console.error("Error searching customers:", error);
+      throw error;
+    }
+  },
+
+  // Customer Relationships
+  async getCustomerRelationships(customerId) {
+    try {
+      const relationshipsRef = collection(db, RELATIONSHIPS_COLLECTION);
+      const q = query(relationshipsRef, where("customerId", "==", customerId));
+      const querySnapshot = await getDocs(q);
+
+      const relationships = [];
+      for (const relationDoc of querySnapshot.docs) {
+        const relationData = relationDoc.data();
+        const relatedCustomer = await this.getCustomerById(
+          relationData.relatedCustomerId
+        );
+        relationships.push({
+          id: relationDoc.id,
+          ...relatedCustomer,
+        });
+      }
+
+      return relationships;
+    } catch (error) {
+      console.error("Error fetching customer relationships:", error);
+      throw error;
+    }
+  },
+
+  // Add customer relationship (bidirectional)
+  async addCustomerRelationship(customerId, relatedCustomerId) {
+    try {
+      const batch = writeBatch(db);
+      const relationshipsRef = collection(db, RELATIONSHIPS_COLLECTION);
+
+      // Add relationship: customerId -> relatedCustomerId
+      const relationRef1 = doc(relationshipsRef);
+      batch.set(relationRef1, {
+        customerId: customerId,
+        relatedCustomerId: relatedCustomerId,
+        createdAt: new Date(),
+      });
+
+      // Add reverse relationship: relatedCustomerId -> customerId
+      const relationRef2 = doc(relationshipsRef);
+      batch.set(relationRef2, {
+        customerId: relatedCustomerId,
+        relatedCustomerId: customerId,
+        createdAt: new Date(),
       });
 
       await batch.commit();
       return true;
     } catch (error) {
-      console.error("Error adding relationship:", error);
+      console.error("Error adding customer relationship:", error);
       throw error;
     }
   },
 
-  // Remove relationship between customers (bidirectional)
-  async removeRelationship(customerId1, customerId2) {
+  // Remove customer relationship (bidirectional)
+  async removeCustomerRelationship(customerId, relatedCustomerId) {
     try {
       const batch = writeBatch(db);
+      const relationshipsRef = collection(db, RELATIONSHIPS_COLLECTION);
 
-      const customer1Ref = doc(db, COLLECTION_NAME, customerId1);
-      const customer2Ref = doc(db, COLLECTION_NAME, customerId2);
-
-      batch.update(customer1Ref, {
-        relationships: arrayRemove(customerId2),
-        updatedAt: new Date(),
-      });
-
-      batch.update(customer2Ref, {
-        relationships: arrayRemove(customerId1),
-        updatedAt: new Date(),
-      });
-
-      await batch.commit();
-      return true;
-    } catch (error) {
-      console.error("Error removing relationship:", error);
-      throw error;
-    }
-  },
-
-  // Remove customer from all relationships (used when deleting)
-  async removeFromAllRelationships(customerId) {
-    try {
-      const customer = await this.getCustomer(customerId);
-
-      if (customer.relationships && customer.relationships.length > 0) {
-        const batch = writeBatch(db);
-
-        for (const relatedId of customer.relationships) {
-          const relatedRef = doc(db, COLLECTION_NAME, relatedId);
-          batch.update(relatedRef, {
-            relationships: arrayRemove(customerId),
-            updatedAt: new Date(),
-          });
-        }
-
-        await batch.commit();
-      }
-
-      return true;
-    } catch (error) {
-      console.error("Error removing from relationships:", error);
-      throw error;
-    }
-  },
-
-  // Check for duplicate customers
-  async checkDuplicates(email, cpaNumber = null) {
-    try {
-      const duplicates = [];
-
-      // Check by email if provided
-      if (email) {
-        const emailQuery = query(
-          collection(db, COLLECTION_NAME),
-          where("email", "==", email)
-        );
-        const emailSnapshot = await getDocs(emailQuery);
-        duplicates.push(
-          ...emailSnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-            duplicateReason: "email",
-          }))
-        );
-      }
-
-      // Check by CPA number if provided
-      if (cpaNumber) {
-        const cpaQuery = query(
-          collection(db, COLLECTION_NAME),
-          where("cpaNumber", "==", cpaNumber)
-        );
-        const cpaSnapshot = await getDocs(cpaQuery);
-        duplicates.push(
-          ...cpaSnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-            duplicateReason: "cpaNumber",
-          }))
-        );
-      }
-
-      // Remove duplicates based on ID
-      const uniqueDuplicates = duplicates.filter(
-        (customer, index, self) =>
-          index === self.findIndex((c) => c.id === customer.id)
+      // Find and remove both directions of the relationship
+      const q1 = query(
+        relationshipsRef,
+        where("customerId", "==", customerId),
+        where("relatedCustomerId", "==", relatedCustomerId)
+      );
+      const q2 = query(
+        relationshipsRef,
+        where("customerId", "==", relatedCustomerId),
+        where("relatedCustomerId", "==", customerId)
       );
 
-      return uniqueDuplicates;
+      const [snapshot1, snapshot2] = await Promise.all([
+        getDocs(q1),
+        getDocs(q2),
+      ]);
+
+      snapshot1.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      snapshot2.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+      return true;
     } catch (error) {
-      console.error("Error checking duplicates:", error);
+      console.error("Error removing customer relationship:", error);
       throw error;
     }
   },
 
-  // Bulk import customers with duplicate checking
-  async bulkImportCustomers(customers) {
+  // Remove all relationships for a customer
+  async removeAllCustomerRelationships(customerId) {
     try {
-      const results = {
-        imported: [],
-        duplicates: [],
-        errors: [],
-      };
+      const relationshipsRef = collection(db, RELATIONSHIPS_COLLECTION);
+      const q1 = query(relationshipsRef, where("customerId", "==", customerId));
+      const q2 = query(
+        relationshipsRef,
+        where("relatedCustomerId", "==", customerId)
+      );
 
-      for (const customerData of customers) {
-        try {
-          // Check for duplicates
-          const duplicates = await this.checkDuplicates(
-            customerData.email,
-            customerData.cpaNumber
-          );
+      const [snapshot1, snapshot2] = await Promise.all([
+        getDocs(q1),
+        getDocs(q2),
+      ]);
 
-          if (duplicates.length > 0) {
-            results.duplicates.push({
-              data: customerData,
-              existingCustomers: duplicates,
-            });
-          } else {
-            // Import customer
-            const imported = await this.createCustomer(customerData);
-            results.imported.push(imported);
-          }
-        } catch (error) {
-          results.errors.push({
+      const batch = writeBatch(db);
+
+      snapshot1.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      snapshot2.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+      return true;
+    } catch (error) {
+      console.error("Error removing all customer relationships:", error);
+      throw error;
+    }
+  },
+
+  // Update custom fields
+  async updateCustomFields(customerId, customFields) {
+    try {
+      const customerRef = doc(db, CUSTOMERS_COLLECTION, customerId);
+      await updateDoc(customerRef, {
+        customFields: customFields,
+        lastActivity: new Date(),
+      });
+      return true;
+    } catch (error) {
+      console.error("Error updating custom fields:", error);
+      throw error;
+    }
+  },
+
+  // CSV Import helper
+  async importCustomersFromCSV(customersData) {
+    try {
+      const batch = writeBatch(db);
+      const customersRef = collection(db, CUSTOMERS_COLLECTION);
+      const results = [];
+
+      for (const customerData of customersData) {
+        // Check for duplicates (by email or cpaNumber)
+        const existing = await this.findDuplicateCustomer(customerData);
+        if (existing) {
+          results.push({
+            status: "skipped",
             data: customerData,
-            error: error.message,
+            reason: "Duplicate found",
           });
+          continue;
+        }
+
+        const newCustomerRef = doc(customersRef);
+        const newCustomer = {
+          ...customerData,
+          createdAt: new Date(),
+          lastActivity: new Date(),
+          relationships: [],
+          customFields: {},
+        };
+
+        batch.set(newCustomerRef, newCustomer);
+        results.push({
+          status: "imported",
+          data: customerData,
+          id: newCustomerRef.id,
+        });
+      }
+
+      await batch.commit();
+      return results;
+    } catch (error) {
+      console.error("Error importing customers:", error);
+      throw error;
+    }
+  },
+
+  // Find duplicate customer
+  async findDuplicateCustomer(customerData) {
+    try {
+      const customersRef = collection(db, CUSTOMERS_COLLECTION);
+      let q;
+
+      if (customerData.email) {
+        q = query(customersRef, where("email", "==", customerData.email));
+        const emailSnapshot = await getDocs(q);
+        if (!emailSnapshot.empty) {
+          return emailSnapshot.docs[0].data();
         }
       }
 
-      return results;
+      if (customerData.cpaNumber) {
+        q = query(
+          customersRef,
+          where("cpaNumber", "==", customerData.cpaNumber)
+        );
+        const cpaSnapshot = await getDocs(q);
+        if (!cpaSnapshot.empty) {
+          return cpaSnapshot.docs[0].data();
+        }
+      }
+
+      return null;
     } catch (error) {
-      console.error("Error in bulk import:", error);
+      console.error("Error checking for duplicates:", error);
       throw error;
     }
   },
 };
-
-export default customerService;
