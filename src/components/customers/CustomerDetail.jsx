@@ -8,6 +8,7 @@ import { useCustomer } from '../../hooks/useCustomers';
 import { useCalls } from '../../hooks/useCalls';
 import Modal from '../common/Modal';
 import CustomerForm from './CustomerForm';
+import { customerService } from '../../services/customerService';
 
 const CustomerDetail = () => {
   const { customerId } = useParams();
