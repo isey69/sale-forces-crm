@@ -1,15 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useMeetings } from "../context/MeetingContext";
+import { callService } from "../services/callService";
 import MeetingCard from "../components/meetings/MeetingCard";
 import MeetingForm from "../components/meetings/MeetingForm";
 import Button from "../components/common/Button";
 import Input, { Select } from "../components/common/Input";
+import Modal from "../components/common/Modal";
+import { Phone, Calendar, Video, Users } from "lucide-react";
+import toast from "react-hot-toast";
 
 const Meetings = () => {
   const {
     filteredMeetings,
     categories,
-    loading,
+    loading: meetingsLoading,
     error,
     filters,
     updateFilters,
@@ -20,7 +24,39 @@ const Meetings = () => {
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState(null);
-  const [viewMode, setViewMode] = useState("upcoming"); // 'all', 'upcoming', 'today', 'calendar'
+  const [viewMode, setViewMode] = useState("upcoming"); // 'all', 'upcoming', 'today', 'calls', 'meetings'
+  const [activeTab, setActiveTab] = useState("all"); // 'all', 'meetings', 'calls'
+  
+  // Call scheduling state
+  const [scheduledCalls, setScheduledCalls] = useState([]);
+  const [callsLoading, setCallsLoading] = useState(false);
+  const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
+  const [scheduleCallFormData, setScheduleCallFormData] = useState({
+    customerId: '',
+    scheduledDate: '',
+    scheduledTime: '',
+    priority: 'medium',
+    purpose: ''
+  });
+
+  // Load scheduled calls
+  const loadScheduledCalls = async () => {
+    try {
+      setCallsLoading(true);
+      // Get all scheduled calls
+      const calls = await callService.getAllScheduledCalls();
+      setScheduledCalls(calls);
+    } catch (error) {
+      console.error('Error loading scheduled calls:', error);
+      toast.error('Failed to load scheduled calls');
+    } finally {
+      setCallsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadScheduledCalls();
+  }, []);
 
   // Filter options
   const statusOptions = [
@@ -72,17 +108,56 @@ const Meetings = () => {
     setEditingMeeting(null);
   };
 
+  const handleScheduleCall = async (e) => {
+    e.preventDefault();
+    try {
+      await callService.scheduleCall(scheduleCallFormData);
+      toast.success('Call scheduled successfully');
+      setShowScheduleCallModal(false);
+      setScheduleCallFormData({
+        customerId: '',
+        scheduledDate: '',
+        scheduledTime: '',
+        priority: 'medium',
+        purpose: ''
+      });
+      await loadScheduledCalls(); // Reload calls
+    } catch (error) {
+      console.error('Error scheduling call:', error);
+      toast.error('Failed to schedule call');
+    }
+  };
+
+  const handleCancelCall = async (callId) => {
+    try {
+      await callService.cancelScheduledCall(callId);
+      toast.success('Call cancelled successfully');
+      await loadScheduledCalls(); // Reload calls
+    } catch (error) {
+      console.error('Error cancelling call:', error);
+      toast.error('Failed to cancel call');
+    }
+  };
+
   const getStats = () => {
-    const total = filteredMeetings.length;
-    const scheduled = filteredMeetings.filter(
+    const totalMeetings = filteredMeetings.length;
+    const scheduledMeetings = filteredMeetings.filter(
       (m) => m.status === "scheduled"
     ).length;
-    const completed = filteredMeetings.filter(
+    const completedMeetings = filteredMeetings.filter(
       (m) => m.status === "completed"
     ).length;
-    const today = getTodaysMeetings().length;
+    const todayMeetings = getTodaysMeetings().length;
+    const totalCalls = scheduledCalls.length;
 
-    return { total, scheduled, completed, today };
+    return { 
+      totalMeetings, 
+      scheduledMeetings, 
+      completedMeetings, 
+      todayMeetings, 
+      totalCalls,
+      totalAppointments: totalMeetings + totalCalls
+    };
   };
 
   const formatDate = (date) => {
@@ -105,34 +180,68 @@ const Meetings = () => {
     });
   };
 
-  const groupMeetingsByDate = (meetings) => {
-    const groups = {};
-    meetings.forEach((meeting) => {
-      const date = meeting.date?.toDate?.() || new Date(meeting.date);
-      const dateKey = date.toDateString();
-      if (!groups[dateKey]) {
-        groups[dateKey] = [];
-      }
-      groups[dateKey].push(meeting);
-    });
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high':
+        return 'bg-red-100 text-red-800';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'low':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
-    // Sort meetings within each date by start time
-    Object.keys(groups).forEach((dateKey) => {
-      groups[dateKey].sort((a, b) => {
-        const timeA = a.startTime || "00:00";
-        const timeB = b.startTime || "00:00";
-        return timeA.localeCompare(timeB);
+  const getFilteredCalls = () => {
+    let filtered = [...scheduledCalls];
+    
+    // Apply date range filter
+    if (filters.dateRange === 'today') {
+      const today = new Date().toDateString();
+      filtered = filtered.filter(call => {
+        const callDate = call.scheduledDate?.toDate?.() || new Date(call.scheduledDate);
+        return callDate.toDateString() === today;
       });
-    });
+    } else if (filters.dateRange === 'upcoming') {
+      const now = new Date();
+      filtered = filtered.filter(call => {
+        const callDate = call.scheduledDate?.toDate?.() || new Date(call.scheduledDate);
+        return callDate >= now;
+      });
+    }
 
-    return groups;
+    // Apply search filter
+    if (filters.search) {
+      filtered = filtered.filter(call =>
+        call.purpose?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        call.customerId?.toLowerCase().includes(filters.search.toLowerCase())
+      );
+    }
+
+    return filtered;
+  };
+
+  const getCombinedAppointments = () => {
+    const meetings = filteredMeetings.map(m => ({ ...m, type: 'meeting' }));
+    const calls = getFilteredCalls().map(c => ({ ...c, type: 'call' }));
+    
+    const combined = [...meetings, ...calls];
+    
+    // Sort by date and time
+    return combined.sort((a, b) => {
+      const dateA = a.date?.toDate?.() || new Date(a.date || a.scheduledDate);
+      const dateB = b.date?.toDate?.() || new Date(b.date || b.scheduledDate);
+      return dateA - dateB;
+    });
   };
 
   const stats = getStats();
   const todaysMeetings = getTodaysMeetings();
   const upcomingMeetings = getUpcomingMeetings();
+  const filteredCalls = getFilteredCalls();
 
-  if (loading) {
+  if (meetingsLoading || callsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -145,31 +254,24 @@ const Meetings = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Meetings</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Schedule and manage your customer meetings
+            Schedule and manage your meetings and calls
           </p>
         </div>
 
-        <div className="mt-4 sm:mt-0">
+        <div className="mt-4 sm:mt-0 flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setShowScheduleCallModal(true)}
+            icon={<Phone className="w-4 h-4" />}
+          >
+            Schedule Call
+          </Button>
           <Button
             variant="primary"
             onClick={() => setShowAddForm(true)}
-            icon={
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-            }
+            icon={<Calendar className="w-4 h-4" />}
           >
             Schedule Meeting
           </Button>
@@ -216,28 +318,44 @@ const Meetings = () => {
       )}
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white rounded-lg shadow-card p-4 border border-gray-200">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <svg
-                className="w-6 h-6 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
+              <Calendar className="w-6 h-6 text-blue-600" />
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Total</p>
               <p className="text-lg font-semibold text-gray-900">
-                {stats.total}
+                {stats.totalAppointments}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-card p-4 border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Users className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Meetings</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {stats.totalMeetings}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-card p-4 border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Phone className="w-6 h-6 text-purple-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Calls</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {stats.totalCalls}
               </p>
             </div>
           </div>
@@ -256,32 +374,6 @@ const Meetings = () => {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Scheduled</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {stats.scheduled}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-card p-4 border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <svg
-                className="w-6 h-6 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
@@ -289,7 +381,7 @@ const Meetings = () => {
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Completed</p>
               <p className="text-lg font-semibold text-gray-900">
-                {stats.completed}
+                {stats.completedMeetings}
               </p>
             </div>
           </div>
@@ -315,280 +407,296 @@ const Meetings = () => {
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Today</p>
               <p className="text-lg font-semibold text-gray-900">
-                {stats.today}
+                {stats.todayMeetings}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Today's Meetings Quick View */}
-      {todaysMeetings.length > 0 && (
-        <div className="bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-primary-900">
-              Today's Meetings
-            </h2>
-            <span className="text-sm text-primary-600">
-              {todaysMeetings.length} meeting
-              {todaysMeetings.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {todaysMeetings.slice(0, 3).map((meeting) => (
-              <div
-                key={meeting.id}
-                className="flex items-center justify-between bg-white rounded-lg p-3 shadow-sm"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatTime(meeting.startTime)}
-                    </span>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-sm text-gray-600">
-                      {meeting.title}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-500">
-                    {meeting.category}
-                  </span>
-                  {meeting.meetingLink && (
-                    <a
-                      href={meeting.meetingLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                        />
-                      </svg>
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-            {todaysMeetings.length > 3 && (
-              <p className="text-sm text-primary-600 text-center">
-                +{todaysMeetings.length - 3} more meeting
-                {todaysMeetings.length - 3 !== 1 ? "s" : ""} today
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Filters and Controls */}
-      <div className="bg-white rounded-lg shadow-card p-4 border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          {/* Search */}
-          <div className="md:col-span-2">
-            <Input
-              placeholder="Search meetings by title, description, or category..."
-              value={filters.search}
-              onChange={handleSearchChange}
-              icon={
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+      {/* Tab Navigation */}
+      <div className="bg-white rounded-lg shadow-card border border-gray-200">
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-8 px-6">
+            {[
+              { key: 'all', label: 'All Appointments', icon: Calendar },
+              { key: 'meetings', label: 'Meetings Only', icon: Users },
+              { key: 'calls', label: 'Calls Only', icon: Phone }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex items-center gap-2 px-3 py-4 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === tab.key
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              }
-            />
-          </div>
-
-          {/* Status Filter */}
-          <Select
-            value={filters.status}
-            onChange={handleStatusFilter}
-            options={statusOptions}
-          />
-
-          {/* Category Filter */}
-          <Select
-            value={filters.category}
-            onChange={handleCategoryFilter}
-            options={categoryOptions}
-          />
-
-          {/* Date Range Filter */}
-          <Select
-            value={filters.dateRange}
-            onChange={handleDateRangeFilter}
-            options={dateRangeOptions}
-          />
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-500">
-              Showing {filteredMeetings.length} meeting
-              {filteredMeetings.length !== 1 ? "s" : ""}
-              {filters.search && ` matching "${filters.search}"`}
-              {filters.status !== "all" && ` with status ${filters.status}`}
-              {filters.category !== "all" && ` in ${filters.category}`}
-            </span>
-          </div>
+        {/* Filters */}
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="md:col-span-1">
+              <Input
+                placeholder="Search..."
+                value={filters.search}
+                onChange={handleSearchChange}
+                icon={
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                }
+              />
+            </div>
 
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-500">View:</span>
-            <button
-              onClick={() => setViewMode("upcoming")}
-              className={`px-3 py-1 text-sm rounded-md ${
-                viewMode === "upcoming"
-                  ? "bg-primary-100 text-primary-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Upcoming
-            </button>
-            <button
-              onClick={() => setViewMode("all")}
-              className={`px-3 py-1 text-sm rounded-md ${
-                viewMode === "all"
-                  ? "bg-primary-100 text-primary-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              All
-            </button>
+            <Select
+              value={filters.status}
+              onChange={handleStatusFilter}
+              options={statusOptions}
+            />
+
+            <Select
+              value={filters.category}
+              onChange={handleCategoryFilter}
+              options={categoryOptions}
+            />
+
+            <Select
+              value={filters.dateRange}
+              onChange={handleDateRangeFilter}
+              options={dateRangeOptions}
+            />
           </div>
         </div>
       </div>
 
-      {/* Meetings Display */}
-      {filteredMeetings.length > 0 ? (
-        viewMode === "upcoming" && upcomingMeetings.length > 0 ? (
-          /* Upcoming Meetings View */
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Upcoming Meetings
-            </h2>
-            <div className="space-y-4">
-              {Object.entries(
-                groupMeetingsByDate(upcomingMeetings.slice(0, 10))
-              ).map(([dateKey, meetings]) => (
-                <div key={dateKey} className="space-y-3">
-                  <h3 className="text-lg font-medium text-gray-900 sticky top-0 bg-gray-50 py-2 px-4 rounded-lg">
-                    {formatDate(new Date(dateKey))}
-                  </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {meetings.map((meeting) => (
-                      <MeetingCard
-                        key={meeting.id}
-                        meeting={meeting}
-                        onEdit={handleEditMeeting}
-                      />
-                    ))}
+      {/* Content based on active tab */}
+      {activeTab === 'all' && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-900">All Appointments</h2>
+          {getCombinedAppointments().length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {getCombinedAppointments().map((appointment) => (
+                <div key={`${appointment.type}-${appointment.id}`} className="bg-white rounded-lg shadow-card p-4 border border-gray-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      {appointment.type === 'meeting' ? (
+                        <Users className="w-5 h-5 text-blue-600" />
+                      ) : (
+                        <Phone className="w-5 h-5 text-green-600" />
+                      )}
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
+                          {appointment.title || appointment.purpose}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {formatDate(appointment.date || appointment.scheduledDate)} at {
+                            formatTime(appointment.startTime || appointment.scheduledTime)
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      appointment.type === 'meeting' 
+                        ? 'bg-blue-100 text-blue-800'
+                        : getPriorityColor(appointment.priority)
+                    }`}>
+                      {appointment.type === 'meeting' ? appointment.category : `${appointment.priority} priority`}
+                    </span>
+                  </div>
+                  
+                  {appointment.type === 'call' && (
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => handleCancelCall(appointment.id)}
+                        className="px-3 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No appointments scheduled</h3>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'meetings' && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-900">Meetings</h2>
+          {filteredMeetings.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filteredMeetings.map((meeting) => (
+                <MeetingCard
+                  key={meeting.id}
+                  meeting={meeting}
+                  onEdit={handleEditMeeting}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Users className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No meetings scheduled</h3>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'calls' && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-900">Scheduled Calls</h2>
+          {filteredCalls.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filteredCalls.map((call) => (
+                <div key={call.id} className="bg-white rounded-lg shadow-card p-4 border border-gray-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-5 h-5 text-green-600" />
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{call.purpose}</h3>
+                        <p className="text-sm text-gray-600">
+                          {formatDate(call.scheduledDate)} at {formatTime(call.scheduledTime)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(call.priority)}`}>
+                      {call.priority} priority
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-end gap-2">
+                    <button className="px-3 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleCancelCall(call.id)}
+                      className="px-3 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        ) : (
-          /* All Meetings View */
-          <div className="space-y-4">
-            {Object.entries(groupMeetingsByDate(filteredMeetings)).map(
-              ([dateKey, meetings]) => (
-                <div key={dateKey} className="space-y-3">
-                  <h3 className="text-lg font-medium text-gray-900 sticky top-0 bg-gray-50 py-2 px-4 rounded-lg">
-                    {formatDate(new Date(dateKey))}
-                  </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {meetings.map((meeting) => (
-                      <MeetingCard
-                        key={meeting.id}
-                        meeting={meeting}
-                        onEdit={handleEditMeeting}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        )
-      ) : (
-        /* Empty State */
-        <div className="text-center py-12">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
-            {filters.search ||
-            filters.status !== "all" ||
-            filters.category !== "all"
-              ? "No meetings found"
-              : "No meetings scheduled"}
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            {filters.search ||
-            filters.status !== "all" ||
-            filters.category !== "all"
-              ? "Try adjusting your search or filters."
-              : "Get started by scheduling your first customer meeting."}
-          </p>
-          {!filters.search &&
-            filters.status === "all" &&
-            filters.category === "all" && (
-              <div className="mt-6">
-                <Button
-                  variant="primary"
-                  onClick={() => setShowAddForm(true)}
-                  icon={
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                      />
-                    </svg>
-                  }
-                >
-                  Schedule First Meeting
-                </Button>
-              </div>
-            )}
+          ) : (
+            <div className="text-center py-12">
+              <Phone className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No calls scheduled</h3>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Modals */}
+      {/* Schedule Call Modal */}
+      <Modal
+        isOpen={showScheduleCallModal}
+        onClose={() => setShowScheduleCallModal(false)}
+        title="Schedule Call"
+        size="lg"
+      >
+        <form onSubmit={handleScheduleCall} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Customer ID</label>
+            <input
+              type="text"
+              value={scheduleCallFormData.customerId}
+              onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, customerId: e.target.value }))}
+              placeholder="Enter customer ID"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+              <input
+                type="date"
+                value={scheduleCallFormData.scheduledDate}
+                onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, scheduledDate: e.target.value }))}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
+              <input
+                type="time"
+                value={scheduleCallFormData.scheduledTime}
+                onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, scheduledTime: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+            <select 
+              value={scheduleCallFormData.priority}
+              onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, priority: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="low">Low Priority</option>
+              <option value="medium">Medium Priority</option>
+              <option value="high">High Priority</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Purpose</label>
+            <textarea
+              rows={3}
+              value={scheduleCallFormData.purpose}
+              onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, purpose: e.target.value }))}
+              placeholder="Purpose of the call..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            ></textarea>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setShowScheduleCallModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit">
+              Schedule Call
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Existing Modals */}
       <MeetingForm
         isOpen={showAddForm}
         onClose={() => setShowAddForm(false)}
