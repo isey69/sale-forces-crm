@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Edit3, Plus, Users, Building, Phone, Mail, 
@@ -8,8 +8,9 @@ import { useCustomer } from '../../hooks/useCustomers';
 import { useCalls } from '../../hooks/useCalls';
 import Modal from '../common/Modal';
 import CustomerForm from './CustomerForm';
+import { customerService } from '../../services/customerService';
 
-const CustomerDetail = () => {
+const CustomerDetail = memo(() => {
   const { customerId } = useParams();
   const navigate = useNavigate();
   
@@ -41,6 +42,8 @@ const CustomerDetail = () => {
   const [showCallModal, setShowCallModal] = useState(false);
   const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
+  const [relationshipSearchTerm, setRelationshipSearchTerm] = useState('');
+  const [relationshipSearchResults, setRelationshipSearchResults] = useState([]);
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const [callFormData, setCallFormData] = useState({
     callType: 'outbound',
@@ -70,40 +73,66 @@ const CustomerDetail = () => {
   });
 
   // Handler functions
-  const handleEditCustomer = () => {
+  const handleEditCustomer = useCallback(() => {
     setShowEditModal(true);
-  };
+  }, []);
 
-  const handleSaveCustomer = async (customerData) => {
+  const handleSaveCustomer = useCallback(async (customerData) => {
     try {
       await updateCustomer(customerData);
       setShowEditModal(false);
     } catch (error) {
       console.error('Failed to save customer:', error);
     }
-  };
+  }, [updateCustomer]);
 
-  const handleAddRelationship = () => {
+  const handleAddRelationship = useCallback(() => {
     setShowRelationshipModal(true);
-  };
+    setRelationshipSearchTerm('');
+    setRelationshipSearchResults([]);
+  }, []);
 
-  const handleRemoveRelationship = async (relationshipId) => {
+  const handleRelationshipSearch = useCallback(async () => {
+    if (relationshipSearchTerm.trim() === '') {
+      setRelationshipSearchResults([]);
+      return;
+    }
+    try {
+      const results = await customerService.searchCustomersByName(relationshipSearchTerm);
+      // Filter out the current customer from the results
+      setRelationshipSearchResults(results.filter(c => c.id !== customerId));
+    } catch (error) {
+      console.error("Failed to search for relationships:", error);
+      setRelationshipSearchResults([]);
+    }
+  }, [relationshipSearchTerm, customerId]);
+
+  const handleAddRelation = useCallback(async (relatedCustomerId) => {
+    try {
+      await addRelationship(relatedCustomerId);
+      setShowRelationshipModal(false);
+    } catch (error) {
+      console.error('Failed to add relationship:', error);
+    }
+  }, [addRelationship]);
+
+  const handleRemoveRelationship = useCallback(async (relationshipId) => {
     try {
       await removeRelationship(relationshipId);
     } catch (error) {
       console.error('Failed to remove relationship:', error);
     }
-  };
+  }, [removeRelationship]);
 
-  const handleScheduleMeeting = () => {
+  const handleScheduleMeeting = useCallback(() => {
     setShowAddMeetingModal(true);
-  };
+  }, []);
 
-  const handleAddNote = () => {
+  const handleAddNote = useCallback(() => {
     setShowAddNoteModal(true);
-  };
+  }, []);
 
-  const handleMeetingFormSubmit = async (e) => {
+  const handleMeetingFormSubmit = useCallback(async (e) => {
     e.preventDefault();
     try {
       // TODO: Implement meeting service
@@ -120,9 +149,9 @@ const CustomerDetail = () => {
     } catch (error) {
       console.error('Failed to schedule meeting:', error);
     }
-  };
+  }, [meetingFormData]);
 
-  const handleNoteFormSubmit = async (e) => {
+  const handleNoteFormSubmit = useCallback(async (e) => {
     e.preventDefault();
     try {
       // TODO: Implement note service
@@ -136,45 +165,61 @@ const CustomerDetail = () => {
     } catch (error) {
       console.error('Failed to add note:', error);
     }
-  };
+  }, [noteFormData]);
 
-  const handleAddCustomField = () => {
+  const handleAddCustomField = useCallback(() => {
     console.log('Add custom field clicked');
-  };
+  }, []);
 
-  const handleLogCall = () => {
+  const handleLogCall = useCallback(() => {
     setShowCallModal(true);
-  };
+  }, []);
 
-  const handleScheduleCall = () => {
+  const handleScheduleCall = useCallback(() => {
     setShowScheduleCallModal(true);
-  };
+  }, []);
 
-  const handleCallFormSubmit = async (e) => {
+  const handleCallFormSubmit = useCallback(async (e) => {
     e.preventDefault();
     try {
+      // If a scheduled call was selected, mark it as complete
+      if (callFormData.scheduledCallId) {
+        await completeScheduledCall(callFormData.scheduledCallId, {
+          status: callFormData.status,
+          outcome: callFormData.outcome,
+        });
+      }
+
       await addCallToHistory({
         date: callFormData.date,
         time: new Date().toLocaleTimeString(),
         duration: `${callFormData.duration} min`,
         status: callFormData.status,
         outcome: callFormData.outcome,
-        callType: callFormData.callType
+        callType: callFormData.callType,
+        linkedScheduledCall: callFormData.scheduledCallId || null,
       });
+
       setShowCallModal(false);
       setCallFormData({
         callType: 'outbound',
         status: 'completed',
         date: new Date().toISOString().split('T')[0],
         duration: '',
-        outcome: ''
+        outcome: '',
+        scheduledCallId: null,
       });
+
+      // If postponed, open schedule modal
+      if (callFormData.status === 'postponed') {
+        setShowScheduleCallModal(true);
+      }
     } catch (error) {
       console.error('Failed to log call:', error);
     }
-  };
+  }, [callFormData, addCallToHistory, completeScheduledCall]);
 
-  const handleScheduleFormSubmit = async (e) => {
+  const handleScheduleFormSubmit = useCallback(async (e) => {
     e.preventDefault();
     try {
       await scheduleCall({
@@ -193,15 +238,15 @@ const CustomerDetail = () => {
     } catch (error) {
       console.error('Failed to schedule call:', error);
     }
-  };
+  }, [scheduleFormData, scheduleCall]);
 
-  const handleCancelScheduledCall = async (callId) => {
+  const handleCancelScheduledCall = useCallback(async (callId) => {
     try {
       await cancelScheduledCall(callId);
     } catch (error) {
       console.error('Failed to cancel call:', error);
     }
-  };
+  }, [cancelScheduledCall]);
 
   // Remove mock data - using Firebase data instead
 
@@ -414,6 +459,20 @@ const CustomerDetail = () => {
                           </div>
                         </div>
                       )}
+                        <div className="flex items-center gap-3">
+                            <ExternalLink className="w-5 h-5 text-gray-400" />
+                            <div>
+                                <p className="text-sm text-gray-600">Line ID</p>
+                                <p className="text-gray-900">{customer.lineID || 'N/A'}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <ExternalLink className="w-5 h-5 text-gray-400" />
+                            <div>
+                                <p className="text-sm text-gray-600">Customer ID</p>
+                                <p className="text-gray-900">{customer.customerID || 'N/A'}</p>
+                            </div>
+                        </div>
                     </div>
                   </div>
 
@@ -484,6 +543,10 @@ const CustomerDetail = () => {
                         <p className="text-gray-900">
                           {customer?.createdAt ? new Date(customer.createdAt).toLocaleDateString() : 'Unknown'}
                         </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">How Nice</p>
+                        <p className="text-gray-900">{customer.howNice ? `${customer.howNice}/10` : 'N/A'}</p>
                       </div>
                     </div>
                   </div>
@@ -591,8 +654,8 @@ const CustomerDetail = () => {
                       </button>
                     </div>
                     <div className="space-y-4">
-                      {scheduledCalls && scheduledCalls.length > 0 ? (
-                        scheduledCalls.map((call) => (
+                      {scheduledCalls && scheduledCalls.filter(c => c.status !== 'completed').length > 0 ? (
+                        scheduledCalls.filter(c => c.status !== 'completed').map((call) => (
                           <div key={call.id} className="bg-gray-50 rounded-lg p-4">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex-1">
@@ -875,14 +938,54 @@ const CustomerDetail = () => {
           title="Add Relationship"
           size="md"
         >
-          <div className="text-center py-8">
-            <p className="text-gray-600">Relationship functionality coming soon...</p>
-            <button
-              onClick={() => setShowRelationshipModal(false)}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Close
-            </button>
+          <div className="p-2">
+            <div className="flex items-center gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="Search for a customer to add..."
+                value={relationshipSearchTerm}
+                onChange={(e) => setRelationshipSearchTerm(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleRelationshipSearch()}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+              <button onClick={handleRelationshipSearch} className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                Search
+              </button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {relationshipSearchResults.length > 0 ? (
+                relationshipSearchResults.map(result => (
+                  <div key={result.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-medium">{result.name} {result.surname}</p>
+                      <p className="text-sm text-gray-500">{result.email}</p>
+                    </div>
+                    <button
+                      onClick={() => handleAddRelation(result.id)}
+                      className="px-3 py-1 text-sm text-white bg-green-600 rounded-lg hover:bg-green-700"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  <p>No search results</p>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-200 text-center">
+              <p className="text-sm text-gray-600 mb-2">Can't find the customer?</p>
+              <button
+                onClick={() => {
+                  setShowRelationshipModal(false);
+                  setShowEditModal(true); // Open the customer form to add a new one
+                }}
+                className="text-blue-600 hover:underline"
+              >
+                + Add a new customer
+              </button>
+            </div>
           </div>
         </Modal>
 
@@ -1060,6 +1163,39 @@ const CustomerDetail = () => {
           size="lg"
         >
           <form onSubmit={handleCallFormSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Link to Scheduled Call (Optional)</label>
+              <select
+                onChange={(e) => {
+                  const callId = e.target.value;
+                  if (callId) {
+                    const selectedCall = scheduledCalls.find(c => c.id === callId);
+                    if (selectedCall) {
+                      setCallFormData(prev => ({
+                        ...prev,
+                        scheduledCallId: callId,
+                        outcome: selectedCall.purpose,
+                      }));
+                    }
+                  } else {
+                    setCallFormData(prev => ({
+                      ...prev,
+                      scheduledCallId: null,
+                      outcome: '',
+                    }));
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a scheduled call</option>
+                {scheduledCalls.filter(c => c.status !== 'completed').map(call => (
+                  <option key={call.id} value={call.id}>
+                    {call.purpose} - {new Date(call.scheduledDate).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Call Type</label>
@@ -1214,6 +1350,6 @@ const CustomerDetail = () => {
       </div>
     </div>
   );
-};
+});
 
 export default CustomerDetail;
