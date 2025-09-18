@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Plus, Upload, Download } from "lucide-react";
 import CustomerTable from "../components/customers/CustomerTable";
 import CustomerForm from "../components/customers/CustomerForm";
@@ -23,12 +23,12 @@ const Customers = () => {
     setShowCustomerForm(true);
   };
 
-  const handleEditCustomer = (customer) => {
+  const handleEditCustomer = useCallback((customer) => {
     setSelectedCustomer(customer);
     setShowCustomerForm(true);
-  };
+  }, []);
 
-  const handleSaveCustomer = async (customerData) => {
+  const handleSaveCustomer = useCallback(async (customerData) => {
     try {
       if (selectedCustomer) {
         await updateCustomer(selectedCustomer.id, customerData);
@@ -40,7 +40,7 @@ const Customers = () => {
     } catch (error) {
       console.error("Error saving customer:", error);
     }
-  };
+  }, [selectedCustomer, addCustomer, updateCustomer]);
 
   const handleImportCSV = () => {
     // TODO: Implement CSV import functionality

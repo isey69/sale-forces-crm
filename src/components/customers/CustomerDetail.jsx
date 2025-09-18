@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Edit3, Plus, Users, Building, Phone, Mail, 
@@ -10,7 +10,7 @@ import Modal from '../common/Modal';
 import CustomerForm from './CustomerForm';
 import { customerService } from '../../services/customerService';
 
-const CustomerDetail = () => {
+const CustomerDetail = memo(() => {
   const { customerId } = useParams();
   const navigate = useNavigate();
   
@@ -73,68 +73,66 @@ const CustomerDetail = () => {
   });
 
   // Handler functions
-  const handleEditCustomer = () => {
+  const handleEditCustomer = useCallback(() => {
     setShowEditModal(true);
-  };
+  }, []);
 
-  const handleSaveCustomer = async (customerData) => {
+  const handleSaveCustomer = useCallback(async (customerData) => {
     try {
       await updateCustomer(customerData);
       setShowEditModal(false);
     } catch (error) {
       console.error('Failed to save customer:', error);
     }
-  };
+  }, [updateCustomer]);
 
-  const handleAddRelationship = () => {
+  const handleAddRelationship = useCallback(() => {
     setShowRelationshipModal(true);
     setRelationshipSearchTerm('');
     setRelationshipSearchResults([]);
-  };
+  }, []);
 
-  const handleRelationshipSearch = async () => {
+  const handleRelationshipSearch = useCallback(async () => {
     if (relationshipSearchTerm.trim() === '') {
       setRelationshipSearchResults([]);
       return;
     }
-    // Note: In a real app, you would have a dedicated search service/hook
-    // For this example, we'll just filter the existing customers list
-    // This is not efficient for large datasets.
-    const allCustomers = await customerService.getAllCustomers();
-    const results = allCustomers.filter(c =>
-      c.id !== customerId &&
-      (c.name.toLowerCase().includes(relationshipSearchTerm.toLowerCase()) ||
-       c.surname.toLowerCase().includes(relationshipSearchTerm.toLowerCase()))
-    );
-    setRelationshipSearchResults(results);
-  };
+    try {
+      const results = await customerService.searchCustomersByName(relationshipSearchTerm);
+      // Filter out the current customer from the results
+      setRelationshipSearchResults(results.filter(c => c.id !== customerId));
+    } catch (error) {
+      console.error("Failed to search for relationships:", error);
+      setRelationshipSearchResults([]);
+    }
+  }, [relationshipSearchTerm, customerId]);
 
-  const handleAddRelation = async (relatedCustomerId) => {
+  const handleAddRelation = useCallback(async (relatedCustomerId) => {
     try {
       await addRelationship(relatedCustomerId);
       setShowRelationshipModal(false);
     } catch (error) {
       console.error('Failed to add relationship:', error);
     }
-  };
+  }, [addRelationship]);
 
-  const handleRemoveRelationship = async (relationshipId) => {
+  const handleRemoveRelationship = useCallback(async (relationshipId) => {
     try {
       await removeRelationship(relationshipId);
     } catch (error) {
       console.error('Failed to remove relationship:', error);
     }
-  };
+  }, [removeRelationship]);
 
-  const handleScheduleMeeting = () => {
+  const handleScheduleMeeting = useCallback(() => {
     setShowAddMeetingModal(true);
-  };
+  }, []);
 
-  const handleAddNote = () => {
+  const handleAddNote = useCallback(() => {
     setShowAddNoteModal(true);
-  };
+  }, []);
 
-  const handleMeetingFormSubmit = async (e) => {
+  const handleMeetingFormSubmit = useCallback(async (e) => {
     e.preventDefault();
     try {
       // TODO: Implement meeting service
@@ -151,9 +149,9 @@ const CustomerDetail = () => {
     } catch (error) {
       console.error('Failed to schedule meeting:', error);
     }
-  };
+  }, [meetingFormData]);
 
-  const handleNoteFormSubmit = async (e) => {
+  const handleNoteFormSubmit = useCallback(async (e) => {
     e.preventDefault();
     try {
       // TODO: Implement note service
@@ -167,21 +165,21 @@ const CustomerDetail = () => {
     } catch (error) {
       console.error('Failed to add note:', error);
     }
-  };
+  }, [noteFormData]);
 
-  const handleAddCustomField = () => {
+  const handleAddCustomField = useCallback(() => {
     console.log('Add custom field clicked');
-  };
+  }, []);
 
-  const handleLogCall = () => {
+  const handleLogCall = useCallback(() => {
     setShowCallModal(true);
-  };
+  }, []);
 
-  const handleScheduleCall = () => {
+  const handleScheduleCall = useCallback(() => {
     setShowScheduleCallModal(true);
-  };
+  }, []);
 
-  const handleCallFormSubmit = async (e) => {
+  const handleCallFormSubmit = useCallback(async (e) => {
     e.preventDefault();
     try {
       // If a scheduled call was selected, mark it as complete
@@ -219,9 +217,9 @@ const CustomerDetail = () => {
     } catch (error) {
       console.error('Failed to log call:', error);
     }
-  };
+  }, [callFormData, addCallToHistory, completeScheduledCall]);
 
-  const handleScheduleFormSubmit = async (e) => {
+  const handleScheduleFormSubmit = useCallback(async (e) => {
     e.preventDefault();
     try {
       await scheduleCall({
@@ -240,15 +238,15 @@ const CustomerDetail = () => {
     } catch (error) {
       console.error('Failed to schedule call:', error);
     }
-  };
+  }, [scheduleFormData, scheduleCall]);
 
-  const handleCancelScheduledCall = async (callId) => {
+  const handleCancelScheduledCall = useCallback(async (callId) => {
     try {
       await cancelScheduledCall(callId);
     } catch (error) {
       console.error('Failed to cancel call:', error);
     }
-  };
+  }, [cancelScheduledCall]);
 
   // Remove mock data - using Firebase data instead
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -12,7 +12,7 @@ import {
   Calendar,
 } from "lucide-react";
 
-const CustomerTable = ({ customers = [] }) => {
+const CustomerTable = ({ customers = [], onEditCustomer }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({
@@ -291,4 +291,4 @@ const CustomerTable = ({ customers = [] }) => {
   );
 };
 
-export default CustomerTable;
+export default memo(CustomerTable);
