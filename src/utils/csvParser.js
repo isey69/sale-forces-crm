@@ -202,10 +202,11 @@ const isValidEmail = (email) => {
 
 // Phone validation (basic format check)
 const isValidPhone = (phone) => {
-  // Remove all non-digit characters
-  const cleanPhone = phone.replace(/\D/g, "");
-  // Check if it's between 10-15 digits
-  return cleanPhone.length >= 10 && cleanPhone.length <= 15;
+  if (!phone) return false;
+  // Count the number of digits in the string
+  const digitCount = (phone.match(/\d/g) || []).length;
+  // Check if it's between 9 and 15 digits
+  return digitCount >= 9 && digitCount <= 15;
 };
 
 // Generate CSV template
