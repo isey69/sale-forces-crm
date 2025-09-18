@@ -12,9 +12,11 @@ const LoadingModal = ({ isOpen, message = 'Loading...' }) => {
       closeOnEscape={false}
       size="sm"
     >
-      <div className="flex flex-col items-center justify-center p-6">
-        <LoadingSpinner size="lg" />
-        <p className="mt-4 text-lg font-medium text-gray-700">{message}</p>
+      <div className="bg-white p-6 rounded-lg">
+        <div className="flex flex-col items-center justify-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-lg font-medium text-gray-700">{message}</p>
+        </div>
       </div>
     </Modal>
   );

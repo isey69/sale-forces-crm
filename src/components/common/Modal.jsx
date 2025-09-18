@@ -131,9 +131,9 @@ export const ConfirmModal = ({
   loading = false,
 }) => {
   const handleConfirm = async () => {
+    if (loading) return;
     try {
       await onConfirm();
-      onClose();
     } catch (error) {
       console.error("Confirmation action failed:", error);
     }

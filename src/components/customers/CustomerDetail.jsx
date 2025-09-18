@@ -55,6 +55,9 @@ const CustomerDetail = memo(() => {
   const [showDeleteCallModal, setShowDeleteCallModal] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [callToDelete, setCallToDelete] = useState(null);
+  const [isDeletingCall, setIsDeletingCall] = useState(false);
+  const [isLoggingCall, setIsLoggingCall] = useState(false);
+  const [isSchedulingCall, setIsSchedulingCall] = useState(false);
   const [callFormData, setCallFormData] = useState({
     callType: 'outbound',
     status: 'completed',
@@ -87,12 +90,15 @@ const CustomerDetail = memo(() => {
     setShowEditModal(true);
   }, []);
 
-  const handleSaveCustomer = useCallback(async (customerData) => {
+  const handleSaveCustomer = useCallback(async (customerData, setLoading) => {
     try {
+      setLoading(true);
       await updateCustomer(customerData);
       setShowEditModal(false);
     } catch (error) {
       console.error('Failed to save customer:', error);
+    } finally {
+      setLoading(false);
     }
   }, [updateCustomer]);
 
@@ -111,8 +117,7 @@ const CustomerDetail = memo(() => {
       const results = await customerService.searchCustomersByName(relationshipSearchTerm);
       // Filter out the current customer from the results
       setRelationshipSearchResults(results.filter(c => c.id !== customerId));
-    } catch (error) {
-      console.error("Failed to search for relationships:", error);
+    } catch (error)      console.error("Failed to search for relationships:", error);
       setRelationshipSearchResults([]);
     }
   }, [relationshipSearchTerm, customerId]);
@@ -191,6 +196,7 @@ const CustomerDetail = memo(() => {
 
   const handleCallFormSubmit = useCallback(async (e) => {
     e.preventDefault();
+    setIsLoggingCall(true);
     try {
       // If a scheduled call was selected, mark it as complete
       if (callFormData.scheduledCallId) {
@@ -226,11 +232,14 @@ const CustomerDetail = memo(() => {
       }
     } catch (error) {
       console.error('Failed to log call:', error);
+    } finally {
+      setIsLoggingCall(false);
     }
   }, [callFormData, addCallToHistory, completeScheduledCall]);
 
   const handleScheduleFormSubmit = useCallback(async (e) => {
     e.preventDefault();
+    setIsSchedulingCall(true);
     try {
       await scheduleCall({
         scheduledDate: scheduleFormData.scheduledDate,
@@ -247,6 +256,8 @@ const CustomerDetail = memo(() => {
       });
     } catch (error) {
       console.error('Failed to schedule call:', error);
+    } finally {
+      setIsSchedulingCall(false);
     }
   }, [scheduleFormData, scheduleCall]);
 
@@ -265,12 +276,15 @@ const CustomerDetail = memo(() => {
 
   const confirmDeleteCall = useCallback(async () => {
     if (callToDelete) {
+      setIsDeletingCall(true);
       try {
         await deleteCallHistory(callToDelete);
         setShowDeleteCallModal(false);
         setCallToDelete(null);
       } catch (error) {
         console.error('Failed to delete call:', error);
+      } finally {
+        setIsDeletingCall(false);
       }
     }
   }, [callToDelete, deleteCallHistory]);
@@ -1025,6 +1039,7 @@ const CustomerDetail = memo(() => {
           onConfirm={confirmDeleteCall}
           title="Delete Call Log"
           message="Are you sure you want to delete this call log? This action cannot be undone."
+          loading={isDeletingCall}
         />
 
         {/* Add Relationship Modal */}
@@ -1362,8 +1377,9 @@ const CustomerDetail = memo(() => {
               <button
                 type="submit"
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={isLoggingCall}
               >
-                Log Call
+                {isLoggingCall ? 'Logging...' : 'Log Call'}
               </button>
             </div>
           </form>
@@ -1447,8 +1463,9 @@ const CustomerDetail = memo(() => {
               <button
                 type="submit"
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                disabled={isSchedulingCall}
               >
-                Schedule Call
+                {isSchedulingCall ? 'Scheduling...' : 'Schedule Call'}
               </button>
             </div>
           </form>
@@ -1466,6 +1483,7 @@ const LabelAssignmentModal = ({
   onAssign,
   onDeassign,
 }) => {
+  const navigate = useNavigate();
   const handleLabelToggle = (labelId, isAssigned) => {
     if (isAssigned) {
       onDeassign(labelId);
@@ -1477,26 +1495,41 @@ const LabelAssignmentModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Manage Labels">
       <div className="space-y-3">
-        {labels.map((label) => {
-          const isAssigned = customerLabels?.includes(label.id);
-          return (
-            <div key={label.id} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span
-                  className="h-4 w-4 rounded-full"
-                  style={{ backgroundColor: label.color }}
-                ></span>
-                <span>{label.name}</span>
+        {labels.length > 0 ? (
+          labels.map((label) => {
+            const isAssigned = customerLabels?.includes(label.id);
+            return (
+              <div key={label.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="h-4 w-4 rounded-full"
+                    style={{ backgroundColor: label.color }}
+                  ></span>
+                  <span>{label.name}</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isAssigned}
+                  onChange={() => handleLabelToggle(label.id, isAssigned)}
+                  className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500"
+                />
               </div>
-              <input
-                type="checkbox"
-                checked={isAssigned}
-                onChange={() => handleLabelToggle(label.id, isAssigned)}
-                className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500"
-              />
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-gray-600 mb-4">No labels have been created yet.</p>
+            <button
+              onClick={() => {
+                onClose();
+                navigate('/labels');
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Create a Label
+            </button>
+          </div>
+        )}
       </div>
     </Modal>
   );

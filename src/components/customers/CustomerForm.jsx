@@ -99,14 +99,7 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
       return;
     }
 
-    setLoading(true);
-    try {
-      await onSave(formData);
-    } catch (error) {
-      console.error("Error saving customer:", error);
-    } finally {
-      setLoading(false);
-    }
+    await onSave(formData, setLoading);
   };
 
   const titleOptions = ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof."];

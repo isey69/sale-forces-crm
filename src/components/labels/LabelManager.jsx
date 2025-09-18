@@ -10,6 +10,7 @@ const LabelManager = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [currentLabel, setCurrentLabel] = useState(null);
   const [labelToDelete, setLabelToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleAddLabel = () => {
     setCurrentLabel(null);
@@ -28,9 +29,14 @@ const LabelManager = () => {
 
   const confirmDelete = async () => {
     if (labelToDelete) {
-      await deleteLabel(labelToDelete.id);
-      setShowDeleteModal(false);
-      setLabelToDelete(null);
+      setIsDeleting(true);
+      try {
+        await deleteLabel(labelToDelete.id);
+        setShowDeleteModal(false);
+        setLabelToDelete(null);
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -107,6 +113,7 @@ const LabelManager = () => {
         onConfirm={confirmDelete}
         title="Delete Label"
         message={`Are you sure you want to delete the label "${labelToDelete?.name}"? This will not remove the label from existing customers.`}
+        loading={isDeleting}
       />
     </div>
   );
@@ -115,10 +122,16 @@ const LabelManager = () => {
 const LabelFormModal = ({ isOpen, onClose, onSave, label }) => {
   const [name, setName] = useState(label?.name || '');
   const [color, setColor] = useState(label?.color || '#cccccc');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSave({ name, color });
+    setIsSaving(true);
+    try {
+      await onSave({ name, color });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const colors = [
@@ -174,8 +187,9 @@ const LabelFormModal = ({ isOpen, onClose, onSave, label }) => {
           <button
             type="submit"
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            disabled={isSaving}
           >
-            Save
+            {isSaving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </form>
