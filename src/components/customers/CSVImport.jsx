@@ -6,7 +6,7 @@ import Modal from "../common/Modal";
 import { Select } from "../common/Input";
 
 const CSVImport = ({ isOpen, onClose, onSuccess }) => {
-  const { importCustomers } = useCustomerContext();
+  const { importCustomersFromCSV: importCustomers } = useCustomerContext();
   const fileInputRef = useRef(null);
 
   const [step, setStep] = useState(1); // 1: Upload, 2: Preview, 3: Results
