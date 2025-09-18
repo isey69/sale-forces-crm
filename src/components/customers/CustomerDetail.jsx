@@ -117,7 +117,8 @@ const CustomerDetail = memo(() => {
       const results = await customerService.searchCustomersByName(relationshipSearchTerm);
       // Filter out the current customer from the results
       setRelationshipSearchResults(results.filter(c => c.id !== customerId));
-    } catch (error)      console.error("Failed to search for relationships:", error);
+    } catch (error) {
+      console.error("Failed to search for relationships:", error);
       setRelationshipSearchResults([]);
     }
   }, [relationshipSearchTerm, customerId]);

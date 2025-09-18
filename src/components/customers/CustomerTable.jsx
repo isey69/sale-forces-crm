@@ -161,6 +161,15 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
                   {getSortIcon("cpaNumber")}
                 </div>
               </th>
+              <th
+                className="px-6 py-4 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider cursor-pointer hover:bg-secondary-100 transition-colors"
+                onClick={() => handleSort("howNice")}
+              >
+                <div className="flex items-center">
+                  How Nice
+                  {getSortIcon("howNice")}
+                </div>
+              </th>
               <th className="px-6 py-4 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
                 Contact
               </th>
@@ -218,6 +227,13 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-secondary-900">
                     {customer.cpaNumber || "-"}
+                  </div>
+                </td>
+
+                {/* How Nice */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-secondary-900">
+                    {customer.howNice ? `${customer.howNice}/10` : "N/A"}
                   </div>
                 </td>
 
