@@ -13,6 +13,10 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
     lineID: "",
     customerID: "",
     howNice: 5,
+    address: "",
+    companyName: "",
+    companyId: "",
+    companyAddress: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -31,6 +35,10 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
         lineID: customer.lineID || "",
         customerID: customer.customerID || "",
         howNice: customer.howNice || 5,
+        address: customer.address || "",
+        companyName: customer.companyName || "",
+        companyId: customer.companyId || "",
+        companyAddress: customer.companyAddress || "",
       });
     }
   }, [customer]);
@@ -311,6 +319,66 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
                 <p className="mt-1 text-sm text-red-600">{errors.customerID}</p>
                 )}
             </div>
+        </div>
+
+        {/* Address */}
+        <div>
+          <label className="block text-sm font-medium text-secondary-700 mb-2">
+            Address
+          </label>
+          <textarea
+            name="address"
+            value={formData.address}
+            onChange={handleInputChange}
+            placeholder="Enter address"
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Company Name */}
+          <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              Company Name
+            </label>
+            <input
+              type="text"
+              name="companyName"
+              value={formData.companyName}
+              onChange={handleInputChange}
+              placeholder="Enter company name"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Company ID */}
+          <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              Company ID
+            </label>
+            <input
+              type="text"
+              name="companyId"
+              value={formData.companyId}
+              onChange={handleInputChange}
+              placeholder="Enter company ID"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Company Address */}
+        <div>
+          <label className="block text-sm font-medium text-secondary-700 mb-2">
+            Company Address
+          </label>
+          <textarea
+            name="companyAddress"
+            value={formData.companyAddress}
+            onChange={handleInputChange}
+            placeholder="Enter company address"
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
         </div>
 
         <div>

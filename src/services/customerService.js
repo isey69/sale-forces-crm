@@ -426,4 +426,48 @@ export const customerService = {
       throw error;
     }
   },
+
+  // Assign a label to a customer
+  async assignLabelToCustomer(customerId, labelId) {
+    try {
+      const customerRef = doc(db, CUSTOMERS_COLLECTION, customerId);
+      const customerDoc = await getDoc(customerRef);
+      if (!customerDoc.exists()) {
+        throw new Error("Customer not found");
+      }
+      const customerData = customerDoc.data();
+      const labels = customerData.labels || [];
+      if (!labels.includes(labelId)) {
+        await updateDoc(customerRef, {
+          labels: [...labels, labelId],
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error("Error assigning label to customer:", error);
+      throw error;
+    }
+  },
+
+  // De-assign a label from a customer
+  async deassignLabelFromCustomer(customerId, labelId) {
+    try {
+      const customerRef = doc(db, CUSTOMERS_COLLECTION, customerId);
+      const customerDoc = await getDoc(customerRef);
+      if (!customerDoc.exists()) {
+        throw new Error("Customer not found");
+      }
+      const customerData = customerDoc.data();
+      const labels = customerData.labels || [];
+      if (labels.includes(labelId)) {
+        await updateDoc(customerRef, {
+          labels: labels.filter((id) => id !== labelId),
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error("Error de-assigning label from customer:", error);
+      throw error;
+    }
+  },
 };

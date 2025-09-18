@@ -21,6 +21,8 @@ import MeetingCategories from "./pages/MeetingCategories";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import CustomerDetail from "./components/customers/CustomerDetail";
+import LabelsPage from "./pages/Labels";
+
 function App() {
   console.log("App component rendering");
   return (
@@ -67,6 +69,7 @@ function AuthenticatedApp() {
             <Route path="/meeting-categories" element={<MeetingCategories />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/customers/:customerId" element={<CustomerDetail />} />
+            <Route path="/labels" element={<LabelsPage />} />
           </Routes>
         </main>
       </div>

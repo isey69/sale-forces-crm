@@ -243,6 +243,28 @@ export const useCustomer = (customerId) => {
     loadCustomer();
   }, [customerId]);
 
+  const assignLabel = async (labelId) => {
+    try {
+      await customerService.assignLabelToCustomer(customerId, labelId);
+      await loadCustomer(); // Reload to show new label
+      toast.success("Label assigned successfully");
+    } catch (err) {
+      toast.error("Failed to assign label");
+      throw err;
+    }
+  };
+
+  const deassignLabel = async (labelId) => {
+    try {
+      await customerService.deassignLabelFromCustomer(customerId, labelId);
+      await loadCustomer(); // Reload to show updated labels
+      toast.success("Label de-assigned successfully");
+    } catch (err) {
+      toast.error("Failed to de-assign label");
+      throw err;
+    }
+  };
+
   return {
     customer,
     relationships,
@@ -253,5 +275,7 @@ export const useCustomer = (customerId) => {
     addRelationship,
     removeRelationship,
     updateCustomFields,
+    assignLabel,
+    deassignLabel,
   };
 };
