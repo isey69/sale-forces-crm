@@ -43,6 +43,37 @@ export const customerService = {
     }
   },
 
+  // More efficient search for relationship adding
+  async searchCustomersByName(name) {
+    if (!name) return [];
+    try {
+      const customersRef = collection(db, CUSTOMERS_COLLECTION);
+      const searchLower = name.toLowerCase();
+      const q = query(
+        customersRef,
+        where('name_lowercase', '>=', searchLower),
+        where('name_lowercase', '<=', searchLower + '\uf8ff'),
+        orderBy('name_lowercase'),
+      );
+
+      const querySnapshot = await getDocs(q);
+      const customers = [];
+      querySnapshot.forEach((doc) => {
+        customers.push({ id: doc.id, ...doc.data() });
+      });
+      return customers;
+    } catch (error) {
+      console.error("Error searching customers by name:", error);
+      // It's likely the composite index is missing. Log a helpful message.
+      if (error.code === 'failed-precondition') {
+        console.error(
+          "Firestore index not found. Please create a composite index on 'customers' collection for 'name_lowercase' ascending."
+        );
+      }
+      throw error;
+    }
+  },
+
   // Get customer by ID
   async getCustomerById(customerId) {
     try {
@@ -73,6 +104,7 @@ export const customerService = {
       const customersRef = collection(db, CUSTOMERS_COLLECTION);
       const newCustomer = {
         ...customerData,
+        name_lowercase: customerData.name.toLowerCase(),
         createdAt: new Date(),
         lastActivity: new Date(),
         relationships: [],
@@ -95,6 +127,10 @@ export const customerService = {
         ...updates,
         lastActivity: new Date(),
       };
+
+      if (updates.name) {
+        updateData.name_lowercase = updates.name.toLowerCase();
+      }
 
       await updateDoc(customerRef, updateData);
       return { id: customerId, ...updateData };
@@ -336,6 +372,7 @@ export const customerService = {
         const newCustomerRef = doc(customersRef);
         const newCustomer = {
           ...customerData,
+          name_lowercase: customerData.name.toLowerCase(),
           createdAt: new Date(),
           lastActivity: new Date(),
           relationships: [],

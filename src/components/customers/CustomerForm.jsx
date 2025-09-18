@@ -10,6 +10,9 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
     surname: "",
     email: "",
     phone: "",
+    lineID: "",
+    customerID: "",
+    howNice: 5,
   });
 
   const [errors, setErrors] = useState({});
@@ -25,6 +28,9 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
         surname: customer.surname || "",
         email: customer.email || "",
         phone: customer.phone || "",
+        lineID: customer.lineID || "",
+        customerID: customer.customerID || "",
+        howNice: customer.howNice || 5,
       });
     }
   }, [customer]);
@@ -263,6 +269,66 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
               <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
             )}
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Line ID */}
+            <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-2">
+                Line ID
+                </label>
+                <input
+                type="text"
+                name="lineID"
+                value={formData.lineID}
+                onChange={handleInputChange}
+                placeholder="Enter Line ID"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                    errors.lineID ? "border-red-300" : "border-secondary-300"
+                }`}
+                />
+                {errors.lineID && (
+                <p className="mt-1 text-sm text-red-600">{errors.lineID}</p>
+                )}
+            </div>
+
+            {/* Customer ID */}
+            <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-2">
+                Customer ID
+                </label>
+                <input
+                type="text"
+                name="customerID"
+                value={formData.customerID}
+                onChange={handleInputChange}
+                placeholder="Enter Customer ID"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                    errors.customerID ? "border-red-300" : "border-secondary-300"
+                }`}
+                />
+                {errors.customerID && (
+                <p className="mt-1 text-sm text-red-600">{errors.customerID}</p>
+                )}
+            </div>
+        </div>
+
+        <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+                How Nice (1-10)
+            </label>
+            <input
+                type="range"
+                name="howNice"
+                min="1"
+                max="10"
+                value={formData.howNice}
+                onChange={handleInputChange}
+                className="w-full h-2 bg-secondary-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="text-center mt-2 text-lg font-bold text-primary-600">
+                {formData.howNice}
+            </div>
         </div>
 
         {/* Form Actions */}
