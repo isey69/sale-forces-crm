@@ -198,23 +198,41 @@ const CustomerDetail = memo(() => {
     e.preventDefault();
     setIsLoggingCall(true);
     try {
-      // If a scheduled call was selected, mark it as complete
       if (callFormData.scheduledCallId) {
-        await completeScheduledCall(callFormData.scheduledCallId, {
+        if (callFormData.status === 'completed') {
+          await completeScheduledCall(callFormData.scheduledCallId, {
+            notes: callFormData.outcome,
+            duration: callFormData.duration,
+          });
+        } else {
+          await addCallToHistory({
+            date: callFormData.date,
+            time: new Date().toLocaleTimeString(),
+            duration: `${callFormData.duration} min`,
+            status: callFormData.status,
+            outcome: callFormData.outcome,
+            callType: callFormData.callType,
+            linkedScheduledCall: callFormData.scheduledCallId,
+          });
+          await cancelScheduledCall(callFormData.scheduledCallId);
+          if (callFormData.status === 'postponed') {
+            setShowScheduleCallModal(true);
+          }
+        }
+      } else {
+        await addCallToHistory({
+          date: callFormData.date,
+          time: new Date().toLocaleTimeString(),
+          duration: `${callFormData.duration} min`,
           status: callFormData.status,
           outcome: callFormData.outcome,
+          callType: callFormData.callType,
+          linkedScheduledCall: null,
         });
+        if (callFormData.status === 'postponed') {
+          setShowScheduleCallModal(true);
+        }
       }
-
-      await addCallToHistory({
-        date: callFormData.date,
-        time: new Date().toLocaleTimeString(),
-        duration: `${callFormData.duration} min`,
-        status: callFormData.status,
-        outcome: callFormData.outcome,
-        callType: callFormData.callType,
-        linkedScheduledCall: callFormData.scheduledCallId || null,
-      });
 
       setShowCallModal(false);
       setCallFormData({
@@ -225,17 +243,12 @@ const CustomerDetail = memo(() => {
         outcome: '',
         scheduledCallId: null,
       });
-
-      // If postponed, open schedule modal
-      if (callFormData.status === 'postponed') {
-        setShowScheduleCallModal(true);
-      }
     } catch (error) {
       console.error('Failed to log call:', error);
     } finally {
       setIsLoggingCall(false);
     }
-  }, [callFormData, addCallToHistory, completeScheduledCall]);
+  }, [callFormData, addCallToHistory, completeScheduledCall, cancelScheduledCall]);
 
   const handleScheduleFormSubmit = useCallback(async (e) => {
     e.preventDefault();
