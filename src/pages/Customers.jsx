@@ -3,6 +3,7 @@ import { Plus, Upload, Download } from "lucide-react";
 import CustomerTable from "../components/customers/CustomerTable";
 import CustomerForm from "../components/customers/CustomerForm";
 import Modal from "../components/common/Modal";
+import CSVImport from "../components/customers/CSVImport";
 import { useCustomers } from "../hooks/useCustomers";
 import { Toaster } from "react-hot-toast";
 
@@ -16,6 +17,7 @@ const Customers = () => {
   } = useCustomers();
 
   const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   const handleAddCustomer = () => {
@@ -43,8 +45,7 @@ const Customers = () => {
   }, [selectedCustomer, addCustomer, updateCustomer]);
 
   const handleImportCSV = () => {
-    // TODO: Implement CSV import functionality
-    console.log("CSV Import clicked");
+    setShowImportModal(true);
   };
 
   const handleExportCSV = () => {
@@ -212,6 +213,16 @@ const Customers = () => {
             />
           </Modal>
         )}
+
+        {/* CSV Import Modal */}
+        <CSVImport
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => {
+            // The useCustomers hook will reload the customers, so we just close the modal
+            setShowImportModal(false);
+          }}
+        />
       </div>
     </div>
   );
