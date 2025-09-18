@@ -273,7 +273,7 @@ export const generateCSVTemplate = (customerType = "CPA") => {
 // Download CSV template
 export const downloadCSVTemplate = (customerType = "CPA") => {
   const csvContent = generateCSVTemplate(customerType);
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
 
   if (link.download !== undefined) {
@@ -360,7 +360,7 @@ export const exportCustomersToCSV = (customers, filename = "customers.csv") => {
   });
 
   const csvContent = csvRows.join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
 
   if (link.download !== undefined) {
