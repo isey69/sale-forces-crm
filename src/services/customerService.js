@@ -352,21 +352,58 @@ export const customerService = {
 
   // CSV Import helper
   async importCustomersFromCSV(customersData) {
-    try {
-      const batch = writeBatch(db);
-      const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      const results = [];
+    if (!customersData || customersData.length === 0) {
+      return { imported: [], duplicates: [], errors: [] };
+    }
 
-      for (const customerData of customersData) {
-        // Check for duplicates (by email or cpaNumber)
-        const existing = await this.findDuplicateCustomer(customerData);
-        if (existing) {
-          results.push({
-            status: "skipped",
-            data: customerData,
-            reason: "Duplicate found",
+    try {
+      const customersRef = collection(db, CUSTOMERS_COLLECTION);
+
+      // 1. Get all emails and cpaNumbers from the import data
+      const emailsToCkeck = customersData
+        .map((c) => c.email)
+        .filter(Boolean);
+      const cpaNumbersToCheck = customersData
+        .map((c) => c.cpaNumber)
+        .filter(Boolean);
+
+      // 2. Batch query for existing customers
+      const existingEmails = new Set();
+      const existingCpaNumbers = new Set();
+
+      const queryBy = async (field, values) => {
+        if (values.length === 0) return;
+        // Firestore 'in' query supports up to 10 elements
+        for (let i = 0; i < values.length; i += 10) {
+          const chunk = values.slice(i, i + 10);
+          const q = query(customersRef, where(field, "in", chunk));
+          const snapshot = await getDocs(q);
+          snapshot.forEach((doc) => {
+            if (field === "email") existingEmails.add(doc.data().email);
+            if (field === "cpaNumber")
+              existingCpaNumbers.add(doc.data().cpaNumber);
           });
-          continue;
+        }
+      };
+
+      await Promise.all([
+        queryBy("email", emailsToCkeck),
+        queryBy("cpaNumber", cpaNumbersToCheck),
+      ]);
+
+      // 3. Process and batch write
+      const batch = writeBatch(db);
+      const results = { imported: [], duplicates: [], errors: [] };
+
+      customersData.forEach((customerData) => {
+        const isDuplicate =
+          (customerData.email && existingEmails.has(customerData.email)) ||
+          (customerData.cpaNumber &&
+            existingCpaNumbers.has(customerData.cpaNumber));
+
+        if (isDuplicate) {
+          results.duplicates.push({ data: customerData });
+          return;
         }
 
         const newCustomerRef = doc(customersRef);
@@ -378,51 +415,14 @@ export const customerService = {
           relationships: [],
           customFields: {},
         };
-
         batch.set(newCustomerRef, newCustomer);
-        results.push({
-          status: "imported",
-          data: customerData,
-          id: newCustomerRef.id,
-        });
-      }
+        results.imported.push({ data: customerData, id: newCustomerRef.id });
+      });
 
       await batch.commit();
       return results;
     } catch (error) {
       console.error("Error importing customers:", error);
-      throw error;
-    }
-  },
-
-  // Find duplicate customer
-  async findDuplicateCustomer(customerData) {
-    try {
-      const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      let q;
-
-      if (customerData.email) {
-        q = query(customersRef, where("email", "==", customerData.email));
-        const emailSnapshot = await getDocs(q);
-        if (!emailSnapshot.empty) {
-          return emailSnapshot.docs[0].data();
-        }
-      }
-
-      if (customerData.cpaNumber) {
-        q = query(
-          customersRef,
-          where("cpaNumber", "==", customerData.cpaNumber)
-        );
-        const cpaSnapshot = await getDocs(q);
-        if (!cpaSnapshot.empty) {
-          return cpaSnapshot.docs[0].data();
-        }
-      }
-
-      return null;
-    } catch (error) {
-      console.error("Error checking for duplicates:", error);
       throw error;
     }
   },
