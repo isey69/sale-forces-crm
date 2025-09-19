@@ -14,6 +14,11 @@ const Customers = () => {
     addCustomer,
     updateCustomer,
     importCustomersFromCSV,
+    loadMoreCustomers,
+    hasMore,
+    loadingMore,
+    statusFilter,
+    handleStatusFilterChange,
   } = useCustomers();
 
   const [showCustomerForm, setShowCustomerForm] = useState(false);
@@ -191,6 +196,11 @@ const Customers = () => {
         <CustomerTable
           customers={customers}
           onEditCustomer={handleEditCustomer}
+          onLoadMore={loadMoreCustomers}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          statusFilter={statusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
         />
 
         {/* Customer Form Modal */}

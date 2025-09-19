@@ -6,20 +6,57 @@ export const useCustomers = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastVisible, setLastVisible] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  // Load all customers
-  const loadCustomers = async () => {
+  // Load initial customers
+  const loadCustomers = async (filter) => {
     try {
       setLoading(true);
       setError(null);
-      const customersData = await customerService.getAllCustomers();
-      setCustomers(customersData);
+      const { customers: newCustomers, lastVisible: newLastVisible } =
+        await customerService.getAllCustomers({ status: filter });
+      setCustomers(newCustomers);
+      setLastVisible(newLastVisible);
+      setHasMore(newCustomers.length > 0);
     } catch (err) {
       setError(err.message);
       toast.error("Failed to load customers");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Load more customers
+  const loadMoreCustomers = async () => {
+    if (!hasMore || loadingMore) return;
+
+    try {
+      setLoadingMore(true);
+      const { customers: newCustomers, lastVisible: newLastVisible } =
+        await customerService.getAllCustomers({
+          status: statusFilter,
+          lastVisible,
+        });
+
+      setCustomers((prev) => [...prev, ...newCustomers]);
+      setLastVisible(newLastVisible);
+      setHasMore(newCustomers.length > 0);
+    } catch (err) {
+      toast.error("Failed to load more customers");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleStatusFilterChange = (newStatus) => {
+    setCustomers([]);
+    setLastVisible(null);
+    setHasMore(true);
+    setStatusFilter(newStatus);
+    loadCustomers(newStatus);
   };
 
   // Add customer
@@ -88,13 +125,16 @@ export const useCustomers = () => {
   const filterCustomersByType = async (type) => {
     try {
       setLoading(true);
+      // This is a simple implementation. For large datasets,
+      // server-side filtering with pagination would be better.
       if (type === "all") {
-        await loadCustomers();
+        await loadCustomers(); // Reloads with pagination
       } else {
         const filteredCustomers = await customerService.getCustomersByType(
           type
         );
         setCustomers(filteredCustomers);
+        setHasMore(false); // Assume filtering shows all results
       }
     } catch (err) {
       toast.error("Failed to filter customers");
@@ -133,7 +173,7 @@ export const useCustomers = () => {
 
   // Initial load
   useEffect(() => {
-    loadCustomers();
+    loadCustomers(statusFilter);
   }, []);
 
   return {
@@ -147,6 +187,11 @@ export const useCustomers = () => {
     searchCustomers,
     filterCustomersByType,
     importCustomersFromCSV,
+    loadMoreCustomers,
+    hasMore,
+    loadingMore,
+    statusFilter,
+    handleStatusFilterChange,
   };
 };
 

@@ -13,7 +13,15 @@ import {
 } from "lucide-react";
 import { CUSTOMER_STATUSES } from "../../utils/constants";
 
-const CustomerTable = ({ customers = [], onEditCustomer }) => {
+const CustomerTable = ({
+  customers = [],
+  onEditCustomer,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
+  statusFilter,
+  onStatusFilterChange,
+}) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({
@@ -21,7 +29,6 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
     direction: "asc",
   });
   const [filterType, setFilterType] = useState("all"); // all, cpa, noncpa
-  const [filterStatus, setFilterStatus] = useState("all");
 
   // Filter and sort customers
   const filteredAndSortedCustomers = useMemo(() => {
@@ -33,13 +40,6 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
         filterType === "cpa"
           ? customer.type === "CPA"
           : customer.type === "NonCPA"
-      );
-    }
-
-    // Filter by status
-    if (filterStatus !== "all") {
-      filtered = filtered.filter(
-        (customer) => customer.status === filterStatus
       );
     }
 
@@ -154,8 +154,8 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-secondary-600" />
               <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                value={statusFilter}
+                onChange={(e) => onStatusFilterChange(e.target.value)}
                 className="px-3 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="all">All Statuses</option>
@@ -367,6 +367,19 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
               ? "Try adjusting your search terms."
               : "Get started by adding your first customer."}
           </p>
+        </div>
+      )}
+
+      {/* Load More Button */}
+      {hasMore && (
+        <div className="p-6 text-center">
+          <button
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoadingMore ? "Loading..." : "Load More"}
+          </button>
         </div>
       )}
     </div>

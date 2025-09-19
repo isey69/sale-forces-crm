@@ -18,7 +18,7 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
     companyName: "",
     companyId: "",
     companyAddress: "",
-    status: "Not Set",
+    status: "New",
   });
 
   const [errors, setErrors] = useState({});
@@ -41,7 +41,7 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
         companyName: customer.companyName || "",
         companyId: customer.companyId || "",
         companyAddress: customer.companyAddress || "",
-        status: customer.status || "Not Set",
+        status: customer.status || "New",
       });
     }
   }, [customer]);

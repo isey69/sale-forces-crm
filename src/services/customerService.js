@@ -10,19 +10,35 @@ import {
   orderBy,
   where,
   writeBatch,
+  limit,
+  startAfter,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
 const CUSTOMERS_COLLECTION = "customers";
 const RELATIONSHIPS_COLLECTION = "customer_relationships";
+const PAGE_SIZE = 20;
 
 // Customer CRUD Operations
 export const customerService = {
-  // Get all customers
-  async getAllCustomers() {
+  // Get all customers with pagination and filtering
+  async getAllCustomers(filters = {}) {
+    const { status, lastVisible } = filters;
     try {
       const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      const q = query(customersRef, orderBy("createdAt", "desc"));
+      const queryConstraints = [orderBy("createdAt", "desc")];
+
+      if (status && status !== "all") {
+        queryConstraints.push(where("status", "==", status));
+      }
+
+      if (lastVisible) {
+        queryConstraints.push(startAfter(lastVisible));
+      }
+
+      queryConstraints.push(limit(PAGE_SIZE));
+
+      const q = query(customersRef, ...queryConstraints);
       const querySnapshot = await getDocs(q);
 
       const customers = [];
@@ -36,7 +52,8 @@ export const customerService = {
         });
       });
 
-      return customers;
+      const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+      return { customers, lastVisible: lastDoc };
     } catch (error) {
       console.error("Error fetching customers:", error);
       throw error;
@@ -185,7 +202,9 @@ export const customerService = {
   // Search customers
   async searchCustomers(searchTerm) {
     try {
-      const customers = await this.getAllCustomers();
+      // Note: This search is client-side and will only search the first page of customers
+      // for performance reasons. A proper server-side search implementation is recommended.
+      const { customers } = await this.getAllCustomers({});
 
       const filtered = customers.filter((customer) => {
         const searchLower = searchTerm.toLowerCase();
