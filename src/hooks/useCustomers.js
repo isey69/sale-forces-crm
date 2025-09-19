@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { customerService } from "../services/customerService";
 import toast from "react-hot-toast";
 
@@ -12,7 +12,7 @@ export const useCustomers = () => {
   const [statusFilter, setStatusFilter] = useState("all");
 
   // Load initial customers
-  const loadCustomers = async (filter) => {
+  const loadCustomers = useCallback(async (filter) => {
     try {
       setLoading(true);
       setError(null);
@@ -27,7 +27,7 @@ export const useCustomers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Load more customers
   const loadMoreCustomers = async () => {
@@ -51,13 +51,13 @@ export const useCustomers = () => {
     }
   };
 
-  const handleStatusFilterChange = (newStatus) => {
+  const handleStatusFilterChange = useCallback((newStatus) => {
     setCustomers([]);
     setLastVisible(null);
     setHasMore(true);
     setStatusFilter(newStatus);
     loadCustomers(newStatus);
-  };
+  }, [loadCustomers]);
 
   // Add customer
   const addCustomer = async (customerData) => {
@@ -109,7 +109,7 @@ export const useCustomers = () => {
   };
 
   // Search customers
-  const searchCustomers = async (searchTerm) => {
+  const searchCustomers = useCallback(async (searchTerm) => {
     try {
       setLoading(true);
       if (searchTerm.trim() === "") {
@@ -125,7 +125,7 @@ export const useCustomers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   // Filter customers by type
   const filterCustomersByType = async (type) => {

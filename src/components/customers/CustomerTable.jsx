@@ -41,7 +41,7 @@ const CustomerTable = ({
     return () => {
       clearTimeout(handler);
     };
-  }, [searchTerm]);
+  }, [searchTerm, onSearch]);
 
   // Filter and sort customers
   const filteredAndSortedCustomers = useMemo(() => {
@@ -69,7 +69,7 @@ const CustomerTable = ({
     }
 
     return filtered;
-  }, [customers, searchTerm, sortConfig, filterType]);
+  }, [customers, sortConfig, filterType]);
 
   const handleSort = (key) => {
     setSortConfig((prevConfig) => ({
