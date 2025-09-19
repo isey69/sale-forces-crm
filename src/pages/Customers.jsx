@@ -61,7 +61,7 @@ const Customers = () => {
     console.log("CSV Export clicked");
   };
 
-  if (loading) {
+  if (loading && customers.length === 0) {
     return (
       <div className="min-h-screen bg-secondary-50 p-6">
         <div className="w-full">
@@ -207,6 +207,7 @@ const Customers = () => {
           onSearch={searchCustomers}
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeFilterChange}
+          loading={loading}
         />
 
         {/* Customer Form Modal */}
