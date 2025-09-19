@@ -1,4 +1,4 @@
-import React, { useState, useMemo, memo } from "react";
+import React, { useState, useMemo, memo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { CUSTOMER_STATUSES } from "../../utils/constants";
 
-import React, { useState, useMemo, memo, useEffect } from "react";
 const CustomerTable = ({
   customers = [],
   onEditCustomer,
