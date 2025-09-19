@@ -67,7 +67,7 @@ const CustomerTable = ({
     }
 
     return filtered;
-  }, [customers, searchTerm, sortConfig, filterType, filterStatus]);
+  }, [customers, searchTerm, sortConfig, filterType]);
 
   const handleSort = (key) => {
     setSortConfig((prevConfig) => ({
