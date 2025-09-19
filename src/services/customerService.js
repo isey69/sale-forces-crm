@@ -60,36 +60,6 @@ export const customerService = {
     }
   },
 
-  // More efficient search for relationship adding
-  async searchCustomersByName(name) {
-    if (!name) return [];
-    try {
-      const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      const searchLower = name.toLowerCase();
-      const q = query(
-        customersRef,
-        where('name_lowercase', '>=', searchLower),
-        where('name_lowercase', '<=', searchLower + '\uf8ff'),
-        orderBy('name_lowercase'),
-      );
-
-      const querySnapshot = await getDocs(q);
-      const customers = [];
-      querySnapshot.forEach((doc) => {
-        customers.push({ id: doc.id, ...doc.data() });
-      });
-      return customers;
-    } catch (error) {
-      console.error("Error searching customers by name:", error);
-      // It's likely the composite index is missing. Log a helpful message.
-      if (error.code === 'failed-precondition') {
-        console.error(
-          "Firestore index not found. Please create a composite index on 'customers' collection for 'name_lowercase' ascending."
-        );
-      }
-      throw error;
-    }
-  },
 
   // Get customer by ID
   async getCustomerById(customerId) {
@@ -128,6 +98,10 @@ export const customerService = {
         customFields: customerData.customFields || {},
       };
 
+      if (customerData.cpaNumber) {
+        newCustomer.cpaNumber_lowercase = customerData.cpaNumber.toLowerCase();
+      }
+
       const docRef = await addDoc(customersRef, newCustomer);
       return { id: docRef.id, ...newCustomer };
     } catch (error) {
@@ -147,6 +121,9 @@ export const customerService = {
 
       if (updates.name) {
         updateData.name_lowercase = updates.name.toLowerCase();
+      }
+      if (updates.cpaNumber) {
+        updateData.cpaNumber_lowercase = updates.cpaNumber.toLowerCase();
       }
 
       await updateDoc(customerRef, updateData);
@@ -199,29 +176,55 @@ export const customerService = {
     }
   },
 
-  // Search customers
+  // Search customers by name or CPA number
   async searchCustomers(searchTerm) {
+    if (!searchTerm) return [];
+    const searchLower = searchTerm.toLowerCase();
+
+    const customersRef = collection(db, CUSTOMERS_COLLECTION);
+
+    // Query for name
+    const nameQuery = query(
+      customersRef,
+      where("name_lowercase", ">=", searchLower),
+      where("name_lowercase", "<=", searchLower + "\uf8ff")
+    );
+
+    // Query for CPA number
+    const cpaQuery = query(
+      customersRef,
+      where("cpaNumber_lowercase", ">=", searchLower),
+      where("cpaNumber_lowercase", "<=", searchLower + "\uf8ff")
+    );
+
     try {
-      // Note: This search is client-side and will only search the first page of customers
-      // for performance reasons. A proper server-side search implementation is recommended.
-      const { customers } = await this.getAllCustomers({});
+      const [nameSnapshot, cpaSnapshot] = await Promise.all([
+        getDocs(nameQuery),
+        getDocs(cpaQuery),
+      ]);
 
-      const filtered = customers.filter((customer) => {
-        const searchLower = searchTerm.toLowerCase();
-        return (
-          customer.name?.toLowerCase().includes(searchLower) ||
-          customer.surname?.toLowerCase().includes(searchLower) ||
-          customer.email?.toLowerCase().includes(searchLower) ||
-          customer.cpaNumber?.toLowerCase().includes(searchLower) ||
-          `${customer.name} ${customer.surname}`
-            .toLowerCase()
-            .includes(searchLower)
-        );
-      });
+      const customersMap = new Map();
 
-      return filtered;
+      const processSnapshot = (snapshot) => {
+        snapshot.forEach((doc) => {
+          if (!customersMap.has(doc.id)) {
+            customersMap.set(doc.id, { id: doc.id, ...doc.data() });
+          }
+        });
+      };
+
+      processSnapshot(nameSnapshot);
+      processSnapshot(cpaSnapshot);
+
+      return Array.from(customersMap.values());
     } catch (error) {
       console.error("Error searching customers:", error);
+      // It's likely the composite index is missing. Log a helpful message.
+      if (error.code === "failed-precondition") {
+        console.error(
+          "Firestore index not found. Please create a composite index on 'customers' collection for 'name_lowercase' ascending and 'cpaNumber_lowercase' ascending."
+        );
+      }
       throw error;
     }
   },

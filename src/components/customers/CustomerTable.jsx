@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { CUSTOMER_STATUSES } from "../../utils/constants";
 
+import React, { useState, useMemo, memo, useEffect } from "react";
 const CustomerTable = ({
   customers = [],
   onEditCustomer,
@@ -21,6 +22,7 @@ const CustomerTable = ({
   isLoadingMore,
   statusFilter,
   onStatusFilterChange,
+  onSearch,
 }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -29,6 +31,17 @@ const CustomerTable = ({
     direction: "asc",
   });
   const [filterType, setFilterType] = useState("all"); // all, cpa, noncpa
+
+  // Debounce search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      onSearch(searchTerm);
+    }, 300); // 300ms delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
 
   // Filter and sort customers
   const filteredAndSortedCustomers = useMemo(() => {
@@ -40,17 +53,6 @@ const CustomerTable = ({
         filterType === "cpa"
           ? customer.type === "CPA"
           : customer.type === "NonCPA"
-      );
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (customer) =>
-          customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          customer.surname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          customer.cpaNumber?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 

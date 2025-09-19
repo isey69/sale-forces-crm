@@ -19,6 +19,7 @@ const Customers = () => {
     loadingMore,
     statusFilter,
     handleStatusFilterChange,
+    searchCustomers,
   } = useCustomers();
 
   const [showCustomerForm, setShowCustomerForm] = useState(false);
@@ -201,6 +202,7 @@ const Customers = () => {
           isLoadingMore={loadingMore}
           statusFilter={statusFilter}
           onStatusFilterChange={handleStatusFilterChange}
+          onSearch={searchCustomers}
         />
 
         {/* Customer Form Modal */}

@@ -112,8 +112,14 @@ export const useCustomers = () => {
   const searchCustomers = async (searchTerm) => {
     try {
       setLoading(true);
-      const searchResults = await customerService.searchCustomers(searchTerm);
-      setCustomers(searchResults);
+      if (searchTerm.trim() === "") {
+        loadCustomers(statusFilter);
+        setHasMore(true);
+      } else {
+        const searchResults = await customerService.searchCustomers(searchTerm);
+        setCustomers(searchResults);
+        setHasMore(false); // No pagination on search results
+      }
     } catch (err) {
       toast.error("Failed to search customers");
     } finally {
