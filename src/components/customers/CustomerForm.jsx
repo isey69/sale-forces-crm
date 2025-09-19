@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Save, X, User, Building } from "lucide-react";
+import { CUSTOMER_STATUSES } from "../../utils/constants";
 
 const CustomerForm = ({ customer, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -17,6 +18,7 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
     companyName: "",
     companyId: "",
     companyAddress: "",
+    status: "Not Set",
   });
 
   const [errors, setErrors] = useState({});
@@ -39,6 +41,7 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
         companyName: customer.companyName || "",
         companyId: customer.companyId || "",
         companyAddress: customer.companyAddress || "",
+        status: customer.status || "Not Set",
       });
     }
   }, [customer]);
@@ -374,22 +377,43 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
           />
         </div>
 
-        <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* How Nice */}
+          <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-2">
+                  How Nice (1-10)
+              </label>
+              <input
+                  type="range"
+                  name="howNice"
+                  min="1"
+                  max="10"
+                  value={formData.howNice}
+                  onChange={handleInputChange}
+                  className="w-full h-2 bg-secondary-200 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="text-center mt-2 text-lg font-bold text-primary-600">
+                  {formData.howNice}
+              </div>
+          </div>
+          {/* Status */}
+          <div>
             <label className="block text-sm font-medium text-secondary-700 mb-2">
-                How Nice (1-10)
+              Status
             </label>
-            <input
-                type="range"
-                name="howNice"
-                min="1"
-                max="10"
-                value={formData.howNice}
-                onChange={handleInputChange}
-                className="w-full h-2 bg-secondary-200 rounded-lg appearance-none cursor-pointer"
-            />
-            <div className="text-center mt-2 text-lg font-bold text-primary-600">
-                {formData.howNice}
-            </div>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent border-secondary-300"
+            >
+              {CUSTOMER_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Form Actions */}

@@ -11,6 +11,7 @@ import {
   Mail,
   Calendar,
 } from "lucide-react";
+import { CUSTOMER_STATUSES } from "../../utils/constants";
 
 const CustomerTable = ({ customers = [], onEditCustomer }) => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
     direction: "asc",
   });
   const [filterType, setFilterType] = useState("all"); // all, cpa, noncpa
+  const [filterStatus, setFilterStatus] = useState("all");
 
   // Filter and sort customers
   const filteredAndSortedCustomers = useMemo(() => {
@@ -31,6 +33,13 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
         filterType === "cpa"
           ? customer.type === "CPA"
           : customer.type === "NonCPA"
+      );
+    }
+
+    // Filter by status
+    if (filterStatus !== "all") {
+      filtered = filtered.filter(
+        (customer) => customer.status === filterStatus
       );
     }
 
@@ -58,7 +67,7 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
     }
 
     return filtered;
-  }, [customers, searchTerm, sortConfig, filterType]);
+  }, [customers, searchTerm, sortConfig, filterType, filterStatus]);
 
   const handleSort = (key) => {
     setSortConfig((prevConfig) => ({
@@ -91,6 +100,23 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
     );
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "New":
+        return "bg-blue-100 text-blue-800";
+      case "Scheduled":
+        return "bg-yellow-100 text-yellow-800";
+      case "Considering":
+        return "bg-purple-100 text-purple-800";
+      case "Lost":
+        return "bg-red-100 text-red-800";
+      case "Customer":
+        return "bg-green-100 text-green-800";
+      default:
+        return "bg-secondary-100 text-secondary-800";
+    }
+  };
+
   return (
     <div className="w-full bg-white rounded-xl shadow-soft">
       {/* Header Controls */}
@@ -108,18 +134,38 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
             />
           </div>
 
-          {/* Type Filter */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-secondary-600" />
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="all">All Customers</option>
-              <option value="cpa">CPA Only</option>
-              <option value="noncpa">NonCPA Only</option>
-            </select>
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Type Filter */}
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-secondary-600" />
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="px-3 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="all">All Types</option>
+                <option value="cpa">CPA Only</option>
+                <option value="noncpa">NonCPA Only</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-secondary-600" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-3 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="all">All Statuses</option>
+                {CUSTOMER_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Results Count */}
@@ -168,6 +214,15 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
                 <div className="flex items-center">
                   How Nice
                   {getSortIcon("howNice")}
+                </div>
+              </th>
+              <th
+                className="px-6 py-4 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider cursor-pointer hover:bg-secondary-100 transition-colors"
+                onClick={() => handleSort("status")}
+              >
+                <div className="flex items-center">
+                  Status
+                  {getSortIcon("status")}
                 </div>
               </th>
               <th className="px-6 py-4 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
@@ -235,6 +290,17 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
                   <div className="text-sm text-secondary-900">
                     {customer.howNice ? `${customer.howNice}/10` : "N/A"}
                   </div>
+                </td>
+
+                {/* Status */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                      customer.status
+                    )}`}
+                  >
+                    {customer.status || "N/A"}
+                  </span>
                 </td>
 
                 {/* Contact */}
