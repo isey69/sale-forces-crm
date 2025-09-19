@@ -20,6 +20,8 @@ const Customers = () => {
     statusFilter,
     handleStatusFilterChange,
     searchCustomers,
+    typeFilter,
+    handleTypeFilterChange,
   } = useCustomers();
 
   const [showCustomerForm, setShowCustomerForm] = useState(false);
@@ -203,6 +205,8 @@ const Customers = () => {
           statusFilter={statusFilter}
           onStatusFilterChange={handleStatusFilterChange}
           onSearch={searchCustomers}
+          typeFilter={typeFilter}
+          onTypeFilterChange={handleTypeFilterChange}
         />
 
         {/* Customer Form Modal */}

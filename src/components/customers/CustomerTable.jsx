@@ -22,6 +22,8 @@ const CustomerTable = ({
   statusFilter,
   onStatusFilterChange,
   onSearch,
+  typeFilter,
+  onTypeFilterChange,
 }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -29,7 +31,6 @@ const CustomerTable = ({
     key: "name",
     direction: "asc",
   });
-  const [filterType, setFilterType] = useState("all"); // all, cpa, noncpa
 
   // Debounce search term
   useEffect(() => {
@@ -45,15 +46,6 @@ const CustomerTable = ({
   // Filter and sort customers
   const filteredAndSortedCustomers = useMemo(() => {
     let filtered = customers;
-
-    // Filter by type
-    if (filterType !== "all") {
-      filtered = filtered.filter((customer) =>
-        filterType === "cpa"
-          ? customer.type === "CPA"
-          : customer.type === "NonCPA"
-      );
-    }
 
     // Sort
     if (sortConfig.key) {
@@ -141,13 +133,13 @@ const CustomerTable = ({
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-secondary-600" />
               <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+                value={typeFilter}
+                onChange={(e) => onTypeFilterChange(e.target.value)}
                 className="px-3 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="all">All Types</option>
-                <option value="cpa">CPA Only</option>
-                <option value="noncpa">NonCPA Only</option>
+                <option value="CPA">CPA Only</option>
+                <option value="NonCPA">NonCPA Only</option>
               </select>
             </div>
 

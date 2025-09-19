@@ -10,14 +10,15 @@ export const useCustomers = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
 
   // Load initial customers
-  const loadCustomers = useCallback(async (filter) => {
+  const loadCustomers = useCallback(async (filters) => {
     try {
       setLoading(true);
       setError(null);
       const { customers: newCustomers, lastVisible: newLastVisible } =
-        await customerService.getAllCustomers({ status: filter });
+        await customerService.getAllCustomers(filters);
       setCustomers(newCustomers);
       setLastVisible(newLastVisible);
       setHasMore(newCustomers.length > 0);
@@ -38,6 +39,7 @@ export const useCustomers = () => {
       const { customers: newCustomers, lastVisible: newLastVisible } =
         await customerService.getAllCustomers({
           status: statusFilter,
+          type: typeFilter,
           lastVisible,
         });
 
@@ -56,8 +58,16 @@ export const useCustomers = () => {
     setLastVisible(null);
     setHasMore(true);
     setStatusFilter(newStatus);
-    loadCustomers(newStatus);
-  }, [loadCustomers]);
+    loadCustomers({ status: newStatus, type: typeFilter });
+  }, [loadCustomers, typeFilter]);
+
+  const handleTypeFilterChange = useCallback((newType) => {
+    setCustomers([]);
+    setLastVisible(null);
+    setHasMore(true);
+    setTypeFilter(newType);
+    loadCustomers({ status: statusFilter, type: newType });
+  }, [loadCustomers, statusFilter]);
 
   // Add customer
   const addCustomer = async (customerData) => {
@@ -113,7 +123,7 @@ export const useCustomers = () => {
     try {
       setLoading(true);
       if (searchTerm.trim() === "") {
-        loadCustomers(statusFilter);
+        loadCustomers({ status: statusFilter, type: typeFilter });
         setHasMore(true);
       } else {
         const searchResults = await customerService.searchCustomers(searchTerm);
@@ -125,29 +135,7 @@ export const useCustomers = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
-
-  // Filter customers by type
-  const filterCustomersByType = async (type) => {
-    try {
-      setLoading(true);
-      // This is a simple implementation. For large datasets,
-      // server-side filtering with pagination would be better.
-      if (type === "all") {
-        await loadCustomers(); // Reloads with pagination
-      } else {
-        const filteredCustomers = await customerService.getCustomersByType(
-          type
-        );
-        setCustomers(filteredCustomers);
-        setHasMore(false); // Assume filtering shows all results
-      }
-    } catch (err) {
-      toast.error("Failed to filter customers");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [statusFilter, typeFilter, loadCustomers]);
 
   // Import customers from CSV
   const importCustomersFromCSV = async (customersData) => {
@@ -179,25 +167,25 @@ export const useCustomers = () => {
 
   // Initial load
   useEffect(() => {
-    loadCustomers(statusFilter);
+    loadCustomers({ status: statusFilter, type: typeFilter });
   }, []);
 
   return {
     customers,
     loading,
     error,
-    loadCustomers,
     addCustomer,
     updateCustomer,
     deleteCustomer,
     searchCustomers,
-    filterCustomersByType,
     importCustomersFromCSV,
     loadMoreCustomers,
     hasMore,
     loadingMore,
     statusFilter,
     handleStatusFilterChange,
+    typeFilter,
+    handleTypeFilterChange,
   };
 };
 

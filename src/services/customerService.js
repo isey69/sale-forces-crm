@@ -23,13 +23,17 @@ const PAGE_SIZE = 20;
 export const customerService = {
   // Get all customers with pagination and filtering
   async getAllCustomers(filters = {}) {
-    const { status, lastVisible } = filters;
+    const { status, type, lastVisible } = filters;
     try {
       const customersRef = collection(db, CUSTOMERS_COLLECTION);
       const queryConstraints = [orderBy("createdAt", "desc")];
 
       if (status && status !== "all") {
         queryConstraints.push(where("status", "==", status));
+      }
+
+      if (type && type !== "all") {
+        queryConstraints.push(where("type", "==", type));
       }
 
       if (lastVisible) {
@@ -91,16 +95,11 @@ export const customerService = {
       const customersRef = collection(db, CUSTOMERS_COLLECTION);
       const newCustomer = {
         ...customerData,
-        name_lowercase: customerData.name.toLowerCase(),
         createdAt: new Date(),
         lastActivity: new Date(),
         relationships: [],
         customFields: customerData.customFields || {},
       };
-
-      if (customerData.cpaNumber) {
-        newCustomer.cpaNumber_lowercase = customerData.cpaNumber.toLowerCase();
-      }
 
       const docRef = await addDoc(customersRef, newCustomer);
       return { id: docRef.id, ...newCustomer };
@@ -118,13 +117,6 @@ export const customerService = {
         ...updates,
         lastActivity: new Date(),
       };
-
-      if (updates.name) {
-        updateData.name_lowercase = updates.name.toLowerCase();
-      }
-      if (updates.cpaNumber) {
-        updateData.cpaNumber_lowercase = updates.cpaNumber.toLowerCase();
-      }
 
       await updateDoc(customerRef, updateData);
       return { id: customerId, ...updateData };
@@ -150,81 +142,41 @@ export const customerService = {
     }
   },
 
-  // Get customers by type
-  async getCustomersByType(type) {
+  // Private helper to fetch all customers without pagination
+  async _fetchAllCustomers() {
     try {
       const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      const q = query(
-        customersRef,
-        where("type", "==", type),
-        orderBy("createdAt", "desc")
-      );
+      const q = query(customersRef, orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
-
       const customers = [];
       querySnapshot.forEach((doc) => {
-        customers.push({
-          id: doc.id,
-          ...doc.data(),
-        });
+        customers.push({ id: doc.id, ...doc.data() });
       });
-
       return customers;
     } catch (error) {
-      console.error("Error fetching customers by type:", error);
+      console.error("Error fetching all customers:", error);
       throw error;
     }
   },
 
-  // Search customers by name or CPA number
+  // Search customers (client-side)
   async searchCustomers(searchTerm) {
     if (!searchTerm) return [];
     const searchLower = searchTerm.toLowerCase();
 
-    const customersRef = collection(db, CUSTOMERS_COLLECTION);
-
-    // Query for name
-    const nameQuery = query(
-      customersRef,
-      where("name_lowercase", ">=", searchLower),
-      where("name_lowercase", "<=", searchLower + "\uf8ff")
-    );
-
-    // Query for CPA number
-    const cpaQuery = query(
-      customersRef,
-      where("cpaNumber_lowercase", ">=", searchLower),
-      where("cpaNumber_lowercase", "<=", searchLower + "\uf8ff")
-    );
-
     try {
-      const [nameSnapshot, cpaSnapshot] = await Promise.all([
-        getDocs(nameQuery),
-        getDocs(cpaQuery),
-      ]);
-
-      const customersMap = new Map();
-
-      const processSnapshot = (snapshot) => {
-        snapshot.forEach((doc) => {
-          if (!customersMap.has(doc.id)) {
-            customersMap.set(doc.id, { id: doc.id, ...doc.data() });
-          }
-        });
-      };
-
-      processSnapshot(nameSnapshot);
-      processSnapshot(cpaSnapshot);
-
-      return Array.from(customersMap.values());
+      const allCustomers = await this._fetchAllCustomers();
+      const filtered = allCustomers.filter((customer) => {
+        return (
+          customer.name?.toLowerCase().includes(searchLower) ||
+          customer.surname?.toLowerCase().includes(searchLower) ||
+          customer.email?.toLowerCase().includes(searchLower) ||
+          customer.cpaNumber?.toLowerCase().includes(searchLower)
+        );
+      });
+      return filtered;
     } catch (error) {
       console.error("Error searching customers:", error);
-      // It's likely the composite index is missing. Log a helpful message.
-      if (error.code === "failed-precondition") {
-        console.error(
-          "Firestore index not found. Please create a composite index on 'customers' collection for 'name_lowercase' ascending and 'cpaNumber_lowercase' ascending."
-        );
-      }
       throw error;
     }
   },
