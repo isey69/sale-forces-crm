@@ -56,7 +56,7 @@ const Customers = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-secondary-50 p-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full">
           <div className="animate-pulse">
             <div className="h-8 bg-secondary-200 rounded w-1/4 mb-6"></div>
             <div className="bg-white rounded-xl p-6">
@@ -86,7 +86,7 @@ const Customers = () => {
           },
         }}
       />
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
