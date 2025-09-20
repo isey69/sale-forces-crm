@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Save, X, User, Building } from "lucide-react";
 import { CUSTOMER_STATUSES } from "../../utils/constants";
 
-const CustomerForm = ({ customer, onSave, onCancel }) => {
+const CustomerForm = ({ customer, onSave, onCancel, applicableCustomFields = [] }) => {
   const [formData, setFormData] = useState({
     type: "CPA",
     cpaNumber: "",
@@ -19,6 +19,7 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
     companyId: "",
     companyAddress: "",
     status: "New",
+    customFields: {},
   });
 
   const [errors, setErrors] = useState({});
@@ -42,6 +43,7 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
         companyId: customer.companyId || "",
         companyAddress: customer.companyAddress || "",
         status: customer.status || "New",
+        customFields: customer.customFields || {},
       });
     }
   }, [customer]);
@@ -106,6 +108,107 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
   };
 
   const titleOptions = ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof."];
+
+  const handleCustomFieldChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const fieldName = name.split('.')[1];
+    setFormData(prev => ({
+      ...prev,
+      customFields: {
+        ...prev.customFields,
+        [fieldName]: type === 'checkbox' ? checked : value
+      }
+    }));
+  };
+
+  const renderCustomField = (field) => {
+    const { name, label, type, required, placeholder, options } = field;
+    const value = formData.customFields?.[name] || '';
+    const error = errors.customFields?.[name];
+
+    switch (type) {
+      case 'text':
+      case 'email':
+      case 'phone':
+      case 'number':
+      case 'date':
+        return (
+          <div key={name}>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              {label} {required && '*'}
+            </label>
+            <input
+              type={type}
+              name={`customFields.${name}`}
+              value={value}
+              onChange={handleCustomFieldChange}
+              placeholder={placeholder}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                error ? "border-red-300" : "border-secondary-300"
+              }`}
+            />
+            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+          </div>
+        );
+      case 'textarea':
+        return (
+          <div key={name} className="md:col-span-2">
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              {label} {required && '*'}
+            </label>
+            <textarea
+              name={`customFields.${name}`}
+              value={value}
+              onChange={handleCustomFieldChange}
+              placeholder={placeholder}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                error ? "border-red-300" : "border-secondary-300"
+              }`}
+            />
+            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+          </div>
+        );
+      case 'select':
+        return (
+          <div key={name}>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              {label} {required && '*'}
+            </label>
+            <select
+              name={`customFields.${name}`}
+              value={value}
+              onChange={handleCustomFieldChange}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                error ? "border-red-300" : "border-secondary-300"
+              }`}
+            >
+              <option value="">{placeholder || `Select ${label}`}</option>
+              {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+          </div>
+        );
+      case 'checkbox':
+        return (
+          <div key={name} className="flex items-center">
+            <input
+              type="checkbox"
+              id={`customFields.${name}`}
+              name={`customFields.${name}`}
+              checked={!!value}
+              onChange={handleCustomFieldChange}
+              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+            />
+            <label htmlFor={`customFields.${name}`} className="ml-2 block text-sm text-gray-900">
+              {label} {required && '*'}
+            </label>
+            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+          </div>
+        )
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -415,6 +518,18 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
             </select>
           </div>
         </div>
+
+        {/* Form Actions */}
+        {applicableCustomFields.length > 0 && (
+          <div className="pt-6 border-t border-secondary-200">
+            <h3 className="text-lg font-medium text-secondary-900 mb-4">
+              Custom Fields
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {applicableCustomFields.map((field) => renderCustomField(field))}
+            </div>
+          </div>
+        )}
 
         {/* Form Actions */}
         <div className="flex justify-end space-x-3 pt-6 border-t border-secondary-200">

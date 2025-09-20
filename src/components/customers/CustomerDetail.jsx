@@ -1026,6 +1026,7 @@ const CustomerDetail = memo(() => {
             customer={customer}
             onSave={handleSaveCustomer}
             onCancel={() => setShowEditModal(false)}
+            applicableCustomFields={applicableCustomFields}
           />
         </Modal>
 
