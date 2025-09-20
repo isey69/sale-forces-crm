@@ -247,7 +247,7 @@ export const callService = {
         date: callDate,
         time: callDate.toLocaleTimeString(),
         duration: callOutcome.duration || 0,
-        status: 'completed',
+        status: callOutcome.status || 'completed',
         outcome: callOutcome.notes || '',
         callType: 'outbound',
         originalScheduledCall: scheduledCallId
@@ -263,6 +263,41 @@ export const callService = {
     } catch (error) {
       console.error('Error completing scheduled call:', error);
       throw error;
+    }
+  },
+
+  async logScheduledCallOutcome(scheduledCallId, callOutcome) {
+    if (callOutcome.status === 'completed') {
+      return this.completeScheduledCall(scheduledCallId, callOutcome);
+    } else {
+      // For 'no_answer' or 'postponed'
+      const callRef = doc(db, SCHEDULED_CALLS_COLLECTION, scheduledCallId);
+      const callDoc = await getDoc(callRef);
+
+      if (!callDoc.exists()) {
+        throw new Error('Scheduled call not found');
+      }
+
+      const scheduledCall = callDoc.data();
+
+      const callDate = callOutcome.date && callOutcome.time
+        ? parse(`${callOutcome.date} ${callOutcome.time}`, 'yyyy-MM-dd HH:mm', new Date())
+        : new Date();
+
+      const callHistoryData = {
+        customerId: scheduledCall.customerId,
+        date: callDate,
+        time: callDate.toLocaleTimeString(),
+        duration: 0, // No duration for these statuses
+        status: callOutcome.status,
+        outcome: callOutcome.notes || '',
+        callType: 'outbound',
+        originalScheduledCall: scheduledCallId
+      };
+
+      await this.addCallToHistory(callHistoryData);
+      await this.cancelScheduledCall(scheduledCallId);
+      return true;
     }
   }
 };

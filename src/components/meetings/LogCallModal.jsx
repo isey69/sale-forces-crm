@@ -10,6 +10,7 @@ const LogCallModal = ({ isOpen, onClose, call, onSuccess }) => {
     time: '',
     duration: '',
     notes: '',
+    status: 'completed',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -21,6 +22,7 @@ const LogCallModal = ({ isOpen, onClose, call, onSuccess }) => {
         time: call.scheduledTime || '',
         duration: '',
         notes: call.purpose || '',
+        status: 'completed',
       });
     }
   }, [call]);
@@ -36,14 +38,15 @@ const LogCallModal = ({ isOpen, onClose, call, onSuccess }) => {
 
     setIsSubmitting(true);
     try {
-      await callService.completeScheduledCall(call.id, {
+      await callService.logScheduledCallOutcome(call.id, {
         notes: formData.notes,
         duration: parseInt(formData.duration, 10) || 0,
         date: formData.date,
         time: formData.time,
+        status: formData.status,
       });
       toast.success('Call logged successfully');
-      onSuccess();
+      onSuccess(formData.status);
       onClose();
     } catch (error) {
       console.error('Error logging call:', error);
@@ -87,6 +90,22 @@ const LogCallModal = ({ isOpen, onClose, call, onSuccess }) => {
               required
             />
           </div>
+        </div>
+        <div>
+          <label htmlFor="status" className="block text-sm font-medium text-gray-700">
+            Status
+          </label>
+          <select
+            id="status"
+            name="status"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            value={formData.status}
+            onChange={handleChange}
+          >
+            <option value="completed">Completed</option>
+            <option value="no_answer">No Answer</option>
+            <option value="postponed">Postponed</option>
+          </select>
         </div>
         <div>
           <label htmlFor="duration" className="block text-sm font-medium text-gray-700">

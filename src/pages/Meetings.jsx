@@ -45,15 +45,6 @@ const Meetings = () => {
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [selectedCall, setSelectedCall] = useState(null);
 
-  const handleOpenLogModal = (call) => {
-    setSelectedCall(call);
-    setIsLogModalOpen(true);
-  };
-
-  const handleLogSuccess = () => {
-    loadScheduledCalls();
-  };
-
   // Load scheduled calls
   const loadScheduledCalls = async () => {
     try {
@@ -66,6 +57,18 @@ const Meetings = () => {
       toast.error('Failed to load scheduled calls');
     } finally {
       setCallsLoading(false);
+    }
+  };
+
+  const handleOpenLogModal = (call) => {
+    setSelectedCall(call);
+    setIsLogModalOpen(true);
+  };
+
+  const handleLogSuccess = (status) => {
+    loadScheduledCalls();
+    if (status === 'postponed') {
+      setShowScheduleCallModal(true);
     }
   };
 
@@ -102,8 +105,6 @@ const Meetings = () => {
 
     fetchCustomerData();
   }, [scheduledCalls]);
-
-  // Filter options
   const statusOptions = [
     { value: "all", label: "All Status" },
     { value: "scheduled", label: "Scheduled" },
@@ -239,7 +240,7 @@ const Meetings = () => {
   };
 
   const getFilteredCalls = () => {
-    let filtered = scheduledCalls.filter(call => call.status === 'scheduled');
+    let filtered = [...scheduledCalls];
     
     // Apply date range filter
     if (filters.dateRange === 'today') {
@@ -259,8 +260,8 @@ const Meetings = () => {
     // Apply search filter
     if (filters.search) {
       filtered = filtered.filter(call =>
-        (customerData[call.customerId]?.name.toLowerCase().includes(filters.search.toLowerCase())) ||
-        (call.purpose?.toLowerCase().includes(filters.search.toLowerCase()))
+        call.purpose?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        call.customerId?.toLowerCase().includes(filters.search.toLowerCase())
       );
     }
 
