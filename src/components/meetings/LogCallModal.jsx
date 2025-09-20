@@ -46,7 +46,7 @@ const LogCallModal = ({ isOpen, onClose, call, onSuccess }) => {
         status: formData.status,
       });
       toast.success('Call logged successfully');
-      onSuccess(formData.status);
+      onSuccess(formData.status, call);
       onClose();
     } catch (error) {
       console.error('Error logging call:', error);

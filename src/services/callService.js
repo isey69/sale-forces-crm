@@ -44,6 +44,32 @@ export const callService = {
     }
   },
 
+  // Get all call history
+  async getAllCallHistory() {
+    try {
+      const callHistoryRef = collection(db, CALL_HISTORY_COLLECTION);
+      const q = query(
+        callHistoryRef,
+        orderBy('date', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+
+      const calls = [];
+      querySnapshot.forEach((doc) => {
+        calls.push({
+          id: doc.id,
+          ...doc.data(),
+          date: doc.data().date?.toDate?.() || doc.data().date
+        });
+      });
+
+      return calls;
+    } catch (error) {
+      console.error('Error fetching all call history:', error);
+      throw error;
+    }
+  },
+
   // Add call to history
   async addCallToHistory(callData) {
     try {

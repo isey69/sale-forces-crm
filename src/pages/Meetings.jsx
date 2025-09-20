@@ -24,7 +24,7 @@ const Meetings = () => {
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState(null);
-  const [activeTab, setActiveTab] = useState("all"); // 'all', 'meetings', 'calls'
+  const [activeTab, setActiveTab] = useState("all"); // 'all', 'meetings', 'calls', 'call-logs'
 
   // Call scheduling state
   const [scheduledCalls, setScheduledCalls] = useState([]);
@@ -41,6 +41,22 @@ const Meetings = () => {
   });
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [selectedCall, setSelectedCall] = useState(null);
+
+  const [callHistory, setCallHistory] = useState([]);
+  const [callHistoryLoading, setCallHistoryLoading] = useState(false);
+
+  const loadCallHistory = async () => {
+    try {
+      setCallHistoryLoading(true);
+      const history = await callService.getAllCallHistory();
+      setCallHistory(history);
+    } catch (error) {
+      console.error("Error loading call history:", error);
+      toast.error("Failed to load call history");
+    } finally {
+      setCallHistoryLoading(false);
+    }
+  };
 
   // Load scheduled calls
   const loadScheduledCalls = async () => {
@@ -62,24 +78,33 @@ const Meetings = () => {
     setIsLogModalOpen(true);
   };
 
-  const handleLogSuccess = (status) => {
+  const handleLogSuccess = (status, call) => {
     loadScheduledCalls();
     if (status === "postponed") {
+      setScheduleCallFormData((prev) => ({
+        ...prev,
+        customerId: call.customerId,
+        purpose: `Follow-up on: ${call.purpose}`,
+      }));
       setShowScheduleCallModal(true);
     }
   };
 
   useEffect(() => {
     loadScheduledCalls();
+    loadCallHistory();
   }, []);
 
   useEffect(() => {
     const fetchCustomerData = async () => {
-      if (scheduledCalls.length === 0) return;
+      if (scheduledCalls.length === 0 && callHistory.length === 0) return;
 
       setCustomersLoading(true);
       const customerIds = [
-        ...new Set(scheduledCalls.map((c) => c.customerId).filter(Boolean)),
+        ...new Set([
+          ...scheduledCalls.map((c) => c.customerId),
+          ...callHistory.map((c) => c.customerId),
+        ].filter(Boolean)),
       ];
       if (customerIds.length === 0) {
         setCustomersLoading(false);
@@ -105,7 +130,7 @@ const Meetings = () => {
     };
 
     fetchCustomerData();
-  }, [scheduledCalls]);
+  }, [scheduledCalls, callHistory]);
   const statusOptions = [
     { value: "all", label: "All Status" },
     { value: "scheduled", label: "Scheduled" },
@@ -217,6 +242,9 @@ const Meetings = () => {
   };
 
   const formatTime = (timeString) => {
+    if (typeof timeString !== 'string' || !timeString.includes(':')) {
+        return "Invalid time";
+    }
     const [hours, minutes] = timeString.split(":");
     const date = new Date();
     date.setHours(parseInt(hours), parseInt(minutes));
@@ -289,7 +317,7 @@ const Meetings = () => {
   const stats = getStats();
   const filteredCalls = getFilteredCalls();
 
-  if (meetingsLoading || callsLoading || customersLoading) {
+  if (meetingsLoading || callsLoading || customersLoading || callHistoryLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -469,7 +497,8 @@ const Meetings = () => {
             {[
               { key: "all", label: "All Appointments", icon: Calendar },
               { key: "meetings", label: "Meetings Only", icon: Users },
-              { key: "calls", label: "Calls Only", icon: Phone },
+              { key: "calls", label: "Scheduled Calls", icon: Phone },
+              { key: "call-logs", label: "Call Logs", icon: Phone },
             ].map((tab) => {
               const Icon = tab.icon;
               return (
@@ -878,6 +907,91 @@ const Meetings = () => {
               <Phone className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">
                 No calls scheduled
+              </h3>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "call-logs" && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Call History
+          </h2>
+          {callHistory.length > 0 ? (
+            <div className="bg-white rounded-lg shadow-card border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Customer
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Outcome
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Date & Time
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {callHistory.map((call) => (
+                    <tr key={call.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {customerData[call.customerId]?.name || "Loading..."}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {customerData[call.customerId]?.email || ""}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {call.outcome}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {formatDate(call.date)}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatTime(call.time)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(
+                            call.status
+                          )}`}
+                        >
+                          {call.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Phone className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">
+                No call history found.
               </h3>
             </div>
           )}
