@@ -2,13 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useMeetings } from "../context/MeetingContext";
 import { callService } from "../services/callService";
 import { customerService } from "../services/customerService";
-import MeetingCard from "../components/meetings/MeetingCard";
 import MeetingForm from "../components/meetings/MeetingForm";
-import LogCallModal from '../components/meetings/LogCallModal';
+import LogCallModal from "../components/meetings/LogCallModal";
 import Button from "../components/common/Button";
 import Input, { Select } from "../components/common/Input";
 import Modal from "../components/common/Modal";
-import { Phone, Calendar, Video, Users } from "lucide-react";
+import { Phone, Calendar, Users } from "lucide-react";
 import toast from "react-hot-toast";
 
 const Meetings = () => {
@@ -20,15 +19,13 @@ const Meetings = () => {
     filters,
     updateFilters,
     getTodaysMeetings,
-    getUpcomingMeetings,
     clearError,
   } = useMeetings();
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState(null);
-  const [viewMode, setViewMode] = useState("upcoming"); // 'all', 'upcoming', 'today', 'calls', 'meetings'
   const [activeTab, setActiveTab] = useState("all"); // 'all', 'meetings', 'calls'
-  
+
   // Call scheduling state
   const [scheduledCalls, setScheduledCalls] = useState([]);
   const [callsLoading, setCallsLoading] = useState(false);
@@ -36,11 +33,11 @@ const Meetings = () => {
   const [customersLoading, setCustomersLoading] = useState(false);
   const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
   const [scheduleCallFormData, setScheduleCallFormData] = useState({
-    customerId: '',
-    scheduledDate: '',
-    scheduledTime: '',
-    priority: 'medium',
-    purpose: ''
+    customerId: "",
+    scheduledDate: "",
+    scheduledTime: "",
+    priority: "medium",
+    purpose: "",
   });
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [selectedCall, setSelectedCall] = useState(null);
@@ -53,8 +50,8 @@ const Meetings = () => {
       const calls = await callService.getAllScheduledCalls();
       setScheduledCalls(calls);
     } catch (error) {
-      console.error('Error loading scheduled calls:', error);
-      toast.error('Failed to load scheduled calls');
+      console.error("Error loading scheduled calls:", error);
+      toast.error("Failed to load scheduled calls");
     } finally {
       setCallsLoading(false);
     }
@@ -67,7 +64,7 @@ const Meetings = () => {
 
   const handleLogSuccess = (status) => {
     loadScheduledCalls();
-    if (status === 'postponed') {
+    if (status === "postponed") {
       setShowScheduleCallModal(true);
     }
   };
@@ -81,14 +78,18 @@ const Meetings = () => {
       if (scheduledCalls.length === 0) return;
 
       setCustomersLoading(true);
-      const customerIds = [...new Set(scheduledCalls.map(c => c.customerId).filter(Boolean))];
+      const customerIds = [
+        ...new Set(scheduledCalls.map((c) => c.customerId).filter(Boolean)),
+      ];
       if (customerIds.length === 0) {
         setCustomersLoading(false);
         return;
       }
 
       try {
-        const customerPromises = customerIds.map(id => customerService.getCustomerById(id));
+        const customerPromises = customerIds.map((id) =>
+          customerService.getCustomerById(id)
+        );
         const customers = await Promise.all(customerPromises);
         const customerMap = customers.reduce((acc, customer) => {
           acc[customer.id] = customer;
@@ -96,8 +97,8 @@ const Meetings = () => {
         }, {});
         setCustomerData(customerMap);
       } catch (error) {
-        console.error('Error fetching customer data:', error);
-        toast.error('Failed to load customer details for calls');
+        console.error("Error fetching customer data:", error);
+        toast.error("Failed to load customer details for calls");
       } finally {
         setCustomersLoading(false);
       }
@@ -158,30 +159,30 @@ const Meetings = () => {
     e.preventDefault();
     try {
       await callService.scheduleCall(scheduleCallFormData);
-      toast.success('Call scheduled successfully');
+      toast.success("Call scheduled successfully");
       setShowScheduleCallModal(false);
       setScheduleCallFormData({
-        customerId: '',
-        scheduledDate: '',
-        scheduledTime: '',
-        priority: 'medium',
-        purpose: ''
+        customerId: "",
+        scheduledDate: "",
+        scheduledTime: "",
+        priority: "medium",
+        purpose: "",
       });
       await loadScheduledCalls(); // Reload calls
     } catch (error) {
-      console.error('Error scheduling call:', error);
-      toast.error('Failed to schedule call');
+      console.error("Error scheduling call:", error);
+      toast.error("Failed to schedule call");
     }
   };
 
   const handleCancelCall = async (callId) => {
     try {
       await callService.cancelScheduledCall(callId);
-      toast.success('Call cancelled successfully');
+      toast.success("Call cancelled successfully");
       await loadScheduledCalls(); // Reload calls
     } catch (error) {
-      console.error('Error cancelling call:', error);
-      toast.error('Failed to cancel call');
+      console.error("Error cancelling call:", error);
+      toast.error("Failed to cancel call");
     }
   };
 
@@ -196,13 +197,13 @@ const Meetings = () => {
     const todayMeetings = getTodaysMeetings().length;
     const totalCalls = scheduledCalls.length;
 
-    return { 
-      totalMeetings, 
-      scheduledMeetings, 
-      completedMeetings, 
-      todayMeetings, 
+    return {
+      totalMeetings,
+      scheduledMeetings,
+      completedMeetings,
+      todayMeetings,
       totalCalls,
-      totalAppointments: totalMeetings + totalCalls
+      totalAppointments: totalMeetings + totalCalls,
     };
   };
 
@@ -228,40 +229,43 @@ const Meetings = () => {
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'high':
-        return 'bg-red-100 text-red-800';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'low':
-        return 'bg-green-100 text-green-800';
+      case "high":
+        return "bg-red-100 text-red-800";
+      case "medium":
+        return "bg-yellow-100 text-yellow-800";
+      case "low":
+        return "bg-green-100 text-green-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getFilteredCalls = () => {
     let filtered = [...scheduledCalls];
-    
+
     // Apply date range filter
-    if (filters.dateRange === 'today') {
+    if (filters.dateRange === "today") {
       const today = new Date().toDateString();
-      filtered = filtered.filter(call => {
-        const callDate = call.scheduledDate?.toDate?.() || new Date(call.scheduledDate);
+      filtered = filtered.filter((call) => {
+        const callDate =
+          call.scheduledDate?.toDate?.() || new Date(call.scheduledDate);
         return callDate.toDateString() === today;
       });
-    } else if (filters.dateRange === 'upcoming') {
+    } else if (filters.dateRange === "upcoming") {
       const now = new Date();
-      filtered = filtered.filter(call => {
-        const callDate = call.scheduledDate?.toDate?.() || new Date(call.scheduledDate);
+      filtered = filtered.filter((call) => {
+        const callDate =
+          call.scheduledDate?.toDate?.() || new Date(call.scheduledDate);
         return callDate >= now;
       });
     }
 
     // Apply search filter
     if (filters.search) {
-      filtered = filtered.filter(call =>
-        call.purpose?.toLowerCase().includes(filters.search.toLowerCase()) ||
-        call.customerId?.toLowerCase().includes(filters.search.toLowerCase())
+      filtered = filtered.filter(
+        (call) =>
+          call.purpose?.toLowerCase().includes(filters.search.toLowerCase()) ||
+          call.customerId?.toLowerCase().includes(filters.search.toLowerCase())
       );
     }
 
@@ -269,11 +273,11 @@ const Meetings = () => {
   };
 
   const getCombinedAppointments = () => {
-    const meetings = filteredMeetings.map(m => ({ ...m, type: 'meeting' }));
-    const calls = getFilteredCalls().map(c => ({ ...c, type: 'call' }));
-    
+    const meetings = filteredMeetings.map((m) => ({ ...m, type: "meeting" }));
+    const calls = getFilteredCalls().map((c) => ({ ...c, type: "call" }));
+
     const combined = [...meetings, ...calls];
-    
+
     // Sort by date and time
     return combined.sort((a, b) => {
       const dateA = a.date?.toDate?.() || new Date(a.date || a.scheduledDate);
@@ -283,8 +287,6 @@ const Meetings = () => {
   };
 
   const stats = getStats();
-  const todaysMeetings = getTodaysMeetings();
-  const upcomingMeetings = getUpcomingMeetings();
   const filteredCalls = getFilteredCalls();
 
   if (meetingsLoading || callsLoading || customersLoading) {
@@ -465,9 +467,9 @@ const Meetings = () => {
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6">
             {[
-              { key: 'all', label: 'All Appointments', icon: Calendar },
-              { key: 'meetings', label: 'Meetings Only', icon: Users },
-              { key: 'calls', label: 'Calls Only', icon: Phone }
+              { key: "all", label: "All Appointments", icon: Calendar },
+              { key: "meetings", label: "Meetings Only", icon: Users },
+              { key: "calls", label: "Calls Only", icon: Phone },
             ].map((tab) => {
               const Icon = tab.icon;
               return (
@@ -476,8 +478,8 @@ const Meetings = () => {
                   onClick={() => setActiveTab(tab.key)}
                   className={`flex items-center gap-2 px-3 py-4 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.key
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -536,19 +538,46 @@ const Meetings = () => {
       </div>
 
       {/* Content based on active tab */}
-      {activeTab === 'all' && (
+      {activeTab === "all" && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">All Appointments</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            All Appointments
+          </h2>
           {getCombinedAppointments().length > 0 ? (
             <div className="bg-white rounded-lg shadow-card border border-gray-200 overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title/Purpose</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer/Category</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status/Priority</th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Type
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Title/Purpose
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Customer/Category
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Date & Time
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Status/Priority
+                    </th>
                     <th scope="col" className="relative px-6 py-3">
                       <span className="sr-only">Actions</span>
                     </th>
@@ -558,40 +587,87 @@ const Meetings = () => {
                   {getCombinedAppointments().map((appointment) => (
                     <tr key={`${appointment.type}-${appointment.id}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          appointment.type === 'meeting' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                        }`}>
-                          {appointment.type === 'meeting' ? <Users className="w-4 h-4 mr-1.5" /> : <Phone className="w-4 h-4 mr-1.5" />}
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            appointment.type === "meeting"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {appointment.type === "meeting" ? (
+                            <Users className="w-4 h-4 mr-1.5" />
+                          ) : (
+                            <Phone className="w-4 h-4 mr-1.5" />
+                          )}
                           {appointment.type}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{appointment.title || appointment.purpose}</div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {appointment.title || appointment.purpose}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
-                          {appointment.type === 'meeting' ? appointment.category : (customerData[appointment.customerId]?.name || 'Loading...')}
+                          {appointment.type === "meeting"
+                            ? appointment.category
+                            : customerData[appointment.customerId]?.name ||
+                              "Loading..."}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatDate(appointment.date || appointment.scheduledDate)}</div>
-                        <div className="text-sm text-gray-500">{formatTime(appointment.startTime || appointment.scheduledTime)}</div>
+                        <div className="text-sm text-gray-900">
+                          {formatDate(
+                            appointment.date || appointment.scheduledDate
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatTime(
+                            appointment.startTime || appointment.scheduledTime
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          appointment.type === 'meeting' ? 'bg-yellow-100 text-yellow-800' : getPriorityColor(appointment.priority)
-                        }`}>
-                          {appointment.type === 'meeting' ? appointment.status : appointment.priority}
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            appointment.type === "meeting"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : getPriorityColor(appointment.priority)
+                          }`}
+                        >
+                          {appointment.type === "meeting"
+                            ? appointment.status
+                            : appointment.priority}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {appointment.type === 'meeting' ? (
-                          <button onClick={() => handleEditMeeting(appointment)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
+                        {appointment.type === "meeting" ? (
+                          <button
+                            onClick={() => handleEditMeeting(appointment)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Edit
+                          </button>
                         ) : (
                           <>
-                            <button onClick={() => handleOpenLogModal(appointment)} className="text-indigo-600 hover:text-indigo-900 mr-4">Log Call</button>
-                            <button className="text-gray-400 hover:text-gray-600 mr-4" disabled>Edit</button>
-                            <button onClick={() => handleCancelCall(appointment.id)} className="text-red-600 hover:text-red-900">Cancel</button>
+                            <button
+                              onClick={() => handleOpenLogModal(appointment)}
+                              className="text-indigo-600 hover:text-indigo-900 mr-4"
+                            >
+                              Log Call
+                            </button>
+                            <button
+                              className="text-gray-400 hover:text-gray-600 mr-4"
+                              disabled
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleCancelCall(appointment.id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Cancel
+                            </button>
                           </>
                         )}
                       </td>
@@ -603,13 +679,15 @@ const Meetings = () => {
           ) : (
             <div className="text-center py-12">
               <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No appointments scheduled</h3>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">
+                No appointments scheduled
+              </h3>
             </div>
           )}
         </div>
       )}
 
-      {activeTab === 'meetings' && (
+      {activeTab === "meetings" && (
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-gray-900">Meetings</h2>
           {filteredMeetings.length > 0 ? (
@@ -617,10 +695,30 @@ const Meetings = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Title
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Category
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Date & Time
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Status
+                    </th>
                     <th scope="col" className="relative px-6 py-3">
                       <span className="sr-only">Actions</span>
                     </th>
@@ -630,22 +728,37 @@ const Meetings = () => {
                   {filteredMeetings.map((meeting) => (
                     <tr key={meeting.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{meeting.title}</div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {meeting.title}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{meeting.category}</div>
+                        <div className="text-sm text-gray-500">
+                          {meeting.category}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatDate(meeting.date)}</div>
-                        <div className="text-sm text-gray-500">{formatTime(meeting.startTime)}</div>
+                        <div className="text-sm text-gray-900">
+                          {formatDate(meeting.date)}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatTime(meeting.startTime)}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800`}>
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800`}
+                        >
                           {meeting.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onClick={() => handleEditMeeting(meeting)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
+                        <button
+                          onClick={() => handleEditMeeting(meeting)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          Edit
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -655,24 +768,48 @@ const Meetings = () => {
           ) : (
             <div className="text-center py-12">
               <Users className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No meetings scheduled</h3>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">
+                No meetings scheduled
+              </h3>
             </div>
           )}
         </div>
       )}
 
-      {activeTab === 'calls' && (
+      {activeTab === "calls" && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">Scheduled Calls</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Scheduled Calls
+          </h2>
           {filteredCalls.length > 0 ? (
             <div className="bg-white rounded-lg shadow-card border border-gray-200 overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purpose</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Customer
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Purpose
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Date & Time
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Priority
+                    </th>
                     <th scope="col" className="relative px-6 py-3">
                       <span className="sr-only">Actions</span>
                     </th>
@@ -683,28 +820,53 @@ const Meetings = () => {
                     <tr key={call.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {customerData[call.customerId]?.name || 'Loading...'}
+                          {customerData[call.customerId]?.name || "Loading..."}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {customerData[call.customerId]?.email || ''}
+                          {customerData[call.customerId]?.email || ""}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{call.purpose}</div>
+                        <div className="text-sm text-gray-900">
+                          {call.purpose}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatDate(call.scheduledDate)}</div>
-                        <div className="text-sm text-gray-500">{formatTime(call.scheduledTime)}</div>
+                        <div className="text-sm text-gray-900">
+                          {formatDate(call.scheduledDate)}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatTime(call.scheduledTime)}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(call.priority)}`}>
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(
+                            call.priority
+                          )}`}
+                        >
                           {call.priority}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onClick={() => handleOpenLogModal(call)} className="text-indigo-600 hover:text-indigo-900 mr-4">Log Call</button>
-                        <button className="text-gray-400 hover:text-gray-600 mr-4" disabled>Edit</button>
-                        <button onClick={() => handleCancelCall(call.id)} className="text-red-600 hover:text-red-900">Cancel</button>
+                        <button
+                          onClick={() => handleOpenLogModal(call)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        >
+                          Log Call
+                        </button>
+                        <button
+                          className="text-gray-400 hover:text-gray-600 mr-4"
+                          disabled
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleCancelCall(call.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Cancel
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -714,7 +876,9 @@ const Meetings = () => {
           ) : (
             <div className="text-center py-12">
               <Phone className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No calls scheduled</h3>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">
+                No calls scheduled
+              </h3>
             </div>
           )}
         </div>
@@ -735,11 +899,18 @@ const Meetings = () => {
       >
         <form onSubmit={handleScheduleCall} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Customer ID</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Customer ID
+            </label>
             <input
               type="text"
               value={scheduleCallFormData.customerId}
-              onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, customerId: e.target.value }))}
+              onChange={(e) =>
+                setScheduleCallFormData((prev) => ({
+                  ...prev,
+                  customerId: e.target.value,
+                }))
+              }
               placeholder="Enter customer ID"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
@@ -748,22 +919,36 @@ const Meetings = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date
+              </label>
               <input
                 type="date"
                 value={scheduleCallFormData.scheduledDate}
-                onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, scheduledDate: e.target.value }))}
-                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) =>
+                  setScheduleCallFormData((prev) => ({
+                    ...prev,
+                    scheduledDate: e.target.value,
+                  }))
+                }
+                min={new Date().toISOString().split("T")[0]}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Time
+              </label>
               <input
                 type="time"
                 value={scheduleCallFormData.scheduledTime}
-                onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, scheduledTime: e.target.value }))}
+                onChange={(e) =>
+                  setScheduleCallFormData((prev) => ({
+                    ...prev,
+                    scheduledTime: e.target.value,
+                  }))
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -771,10 +956,17 @@ const Meetings = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-            <select 
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Priority
+            </label>
+            <select
               value={scheduleCallFormData.priority}
-              onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, priority: e.target.value }))}
+              onChange={(e) =>
+                setScheduleCallFormData((prev) => ({
+                  ...prev,
+                  priority: e.target.value,
+                }))
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="low">Low Priority</option>
@@ -784,11 +976,18 @@ const Meetings = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Purpose</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Purpose
+            </label>
             <textarea
               rows={3}
               value={scheduleCallFormData.purpose}
-              onChange={(e) => setScheduleCallFormData(prev => ({ ...prev, purpose: e.target.value }))}
+              onChange={(e) =>
+                setScheduleCallFormData((prev) => ({
+                  ...prev,
+                  purpose: e.target.value,
+                }))
+              }
               placeholder="Purpose of the call..."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required

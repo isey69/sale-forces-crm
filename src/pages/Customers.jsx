@@ -13,7 +13,6 @@ const Customers = () => {
     loading,
     addCustomer,
     updateCustomer,
-    importCustomersFromCSV,
     loadMoreCustomers,
     hasMore,
     loadingMore,
@@ -38,19 +37,22 @@ const Customers = () => {
     setShowCustomerForm(true);
   }, []);
 
-  const handleSaveCustomer = useCallback(async (customerData) => {
-    try {
-      if (selectedCustomer) {
-        await updateCustomer(selectedCustomer.id, customerData);
-      } else {
-        await addCustomer(customerData);
+  const handleSaveCustomer = useCallback(
+    async (customerData) => {
+      try {
+        if (selectedCustomer) {
+          await updateCustomer(selectedCustomer.id, customerData);
+        } else {
+          await addCustomer(customerData);
+        }
+        setShowCustomerForm(false);
+        setSelectedCustomer(null);
+      } catch (error) {
+        console.error("Error saving customer:", error);
       }
-      setShowCustomerForm(false);
-      setSelectedCustomer(null);
-    } catch (error) {
-      console.error("Error saving customer:", error);
-    }
-  }, [selectedCustomer, addCustomer, updateCustomer]);
+    },
+    [selectedCustomer, addCustomer, updateCustomer]
+  );
 
   const handleImportCSV = () => {
     setShowImportModal(true);
