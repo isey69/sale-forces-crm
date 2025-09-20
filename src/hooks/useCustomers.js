@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { customerService } from "../services/customerService";
 import toast from "react-hot-toast";
 
@@ -6,21 +6,68 @@ export const useCustomers = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastVisible, setLastVisible] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
 
-  // Load all customers
-  const loadCustomers = async () => {
+  // Load initial customers
+  const loadCustomers = useCallback(async (filters) => {
     try {
       setLoading(true);
       setError(null);
-      const customersData = await customerService.getAllCustomers();
-      setCustomers(customersData);
+      const { customers: newCustomers, lastVisible: newLastVisible } =
+        await customerService.getAllCustomers(filters);
+      setCustomers(newCustomers);
+      setLastVisible(newLastVisible);
+      setHasMore(newCustomers.length > 0);
     } catch (err) {
       setError(err.message);
       toast.error("Failed to load customers");
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Load more customers
+  const loadMoreCustomers = async () => {
+    if (!hasMore || loadingMore) return;
+
+    try {
+      setLoadingMore(true);
+      const { customers: newCustomers, lastVisible: newLastVisible } =
+        await customerService.getAllCustomers({
+          status: statusFilter,
+          type: typeFilter,
+          lastVisible,
+        });
+
+      setCustomers((prev) => [...prev, ...newCustomers]);
+      setLastVisible(newLastVisible);
+      setHasMore(newCustomers.length > 0);
+    } catch (err) {
+      toast.error("Failed to load more customers");
+    } finally {
+      setLoadingMore(false);
+    }
   };
+
+  const handleStatusFilterChange = useCallback((newStatus) => {
+    setCustomers([]);
+    setLastVisible(null);
+    setHasMore(true);
+    setStatusFilter(newStatus);
+    loadCustomers({ status: newStatus, type: typeFilter });
+  }, [loadCustomers, typeFilter]);
+
+  const handleTypeFilterChange = useCallback((newType) => {
+    setCustomers([]);
+    setLastVisible(null);
+    setHasMore(true);
+    setTypeFilter(newType);
+    loadCustomers({ status: statusFilter, type: newType });
+  }, [loadCustomers, statusFilter]);
 
   // Add customer
   const addCustomer = async (customerData) => {
@@ -72,36 +119,23 @@ export const useCustomers = () => {
   };
 
   // Search customers
-  const searchCustomers = async (searchTerm) => {
+  const searchCustomers = useCallback(async (searchTerm) => {
     try {
       setLoading(true);
-      const searchResults = await customerService.searchCustomers(searchTerm);
-      setCustomers(searchResults);
+      if (searchTerm.trim() === "") {
+        loadCustomers({ status: statusFilter, type: typeFilter });
+        setHasMore(true);
+      } else {
+        const searchResults = await customerService.searchCustomers(searchTerm);
+        setCustomers(searchResults);
+        setHasMore(false); // No pagination on search results
+      }
     } catch (err) {
       toast.error("Failed to search customers");
     } finally {
       setLoading(false);
     }
-  };
-
-  // Filter customers by type
-  const filterCustomersByType = async (type) => {
-    try {
-      setLoading(true);
-      if (type === "all") {
-        await loadCustomers();
-      } else {
-        const filteredCustomers = await customerService.getCustomersByType(
-          type
-        );
-        setCustomers(filteredCustomers);
-      }
-    } catch (err) {
-      toast.error("Failed to filter customers");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [statusFilter, typeFilter, loadCustomers]);
 
   // Import customers from CSV
   const importCustomersFromCSV = async (customersData) => {
@@ -133,20 +167,25 @@ export const useCustomers = () => {
 
   // Initial load
   useEffect(() => {
-    loadCustomers();
+    loadCustomers({ status: statusFilter, type: typeFilter });
   }, []);
 
   return {
     customers,
     loading,
     error,
-    loadCustomers,
     addCustomer,
     updateCustomer,
     deleteCustomer,
     searchCustomers,
-    filterCustomersByType,
     importCustomersFromCSV,
+    loadMoreCustomers,
+    hasMore,
+    loadingMore,
+    statusFilter,
+    handleStatusFilterChange,
+    typeFilter,
+    handleTypeFilterChange,
   };
 };
 
@@ -243,6 +282,28 @@ export const useCustomer = (customerId) => {
     loadCustomer();
   }, [customerId]);
 
+  const assignLabel = async (labelId) => {
+    try {
+      await customerService.assignLabelToCustomer(customerId, labelId);
+      await loadCustomer(); // Reload to show new label
+      toast.success("Label assigned successfully");
+    } catch (err) {
+      toast.error("Failed to assign label");
+      throw err;
+    }
+  };
+
+  const deassignLabel = async (labelId) => {
+    try {
+      await customerService.deassignLabelFromCustomer(customerId, labelId);
+      await loadCustomer(); // Reload to show updated labels
+      toast.success("Label de-assigned successfully");
+    } catch (err) {
+      toast.error("Failed to de-assign label");
+      throw err;
+    }
+  };
+
   return {
     customer,
     relationships,
@@ -253,5 +314,7 @@ export const useCustomer = (customerId) => {
     addRelationship,
     removeRelationship,
     updateCustomFields,
+    assignLabel,
+    deassignLabel,
   };
 };

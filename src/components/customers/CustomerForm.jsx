@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Save, X, User, Building } from "lucide-react";
+import { CUSTOMER_STATUSES } from "../../utils/constants";
 
 const CustomerForm = ({ customer, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -13,6 +14,11 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
     lineID: "",
     customerID: "",
     howNice: 5,
+    address: "",
+    companyName: "",
+    companyId: "",
+    companyAddress: "",
+    status: "New",
   });
 
   const [errors, setErrors] = useState({});
@@ -31,6 +37,11 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
         lineID: customer.lineID || "",
         customerID: customer.customerID || "",
         howNice: customer.howNice || 5,
+        address: customer.address || "",
+        companyName: customer.companyName || "",
+        companyId: customer.companyId || "",
+        companyAddress: customer.companyAddress || "",
+        status: customer.status || "New",
       });
     }
   }, [customer]);
@@ -91,14 +102,7 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
       return;
     }
 
-    setLoading(true);
-    try {
-      await onSave(formData);
-    } catch (error) {
-      console.error("Error saving customer:", error);
-    } finally {
-      setLoading(false);
-    }
+    await onSave(formData, setLoading);
   };
 
   const titleOptions = ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof."];
@@ -313,22 +317,103 @@ const CustomerForm = ({ customer, onSave, onCancel }) => {
             </div>
         </div>
 
+        {/* Address */}
         <div>
+          <label className="block text-sm font-medium text-secondary-700 mb-2">
+            Address
+          </label>
+          <textarea
+            name="address"
+            value={formData.address}
+            onChange={handleInputChange}
+            placeholder="Enter address"
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Company Name */}
+          <div>
             <label className="block text-sm font-medium text-secondary-700 mb-2">
-                How Nice (1-10)
+              Company Name
             </label>
             <input
-                type="range"
-                name="howNice"
-                min="1"
-                max="10"
-                value={formData.howNice}
-                onChange={handleInputChange}
-                className="w-full h-2 bg-secondary-200 rounded-lg appearance-none cursor-pointer"
+              type="text"
+              name="companyName"
+              value={formData.companyName}
+              onChange={handleInputChange}
+              placeholder="Enter company name"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
-            <div className="text-center mt-2 text-lg font-bold text-primary-600">
-                {formData.howNice}
-            </div>
+          </div>
+
+          {/* Company ID */}
+          <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              Company ID
+            </label>
+            <input
+              type="text"
+              name="companyId"
+              value={formData.companyId}
+              onChange={handleInputChange}
+              placeholder="Enter company ID"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Company Address */}
+        <div>
+          <label className="block text-sm font-medium text-secondary-700 mb-2">
+            Company Address
+          </label>
+          <textarea
+            name="companyAddress"
+            value={formData.companyAddress}
+            onChange={handleInputChange}
+            placeholder="Enter company address"
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* How Nice */}
+          <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-2">
+                  How Nice (1-10)
+              </label>
+              <input
+                  type="range"
+                  name="howNice"
+                  min="1"
+                  max="10"
+                  value={formData.howNice}
+                  onChange={handleInputChange}
+                  className="w-full h-2 bg-secondary-200 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="text-center mt-2 text-lg font-bold text-primary-600">
+                  {formData.howNice}
+              </div>
+          </div>
+          {/* Status */}
+          <div>
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              Status
+            </label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent border-secondary-300"
+            >
+              {CUSTOMER_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Form Actions */}

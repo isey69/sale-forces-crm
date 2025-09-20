@@ -1,4 +1,4 @@
-import React, { useState, useMemo, memo } from "react";
+import React, { useState, useMemo, memo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -11,39 +11,42 @@ import {
   Mail,
   Calendar,
 } from "lucide-react";
+import { CUSTOMER_STATUSES } from "../../utils/constants";
 
-const CustomerTable = ({ customers = [], onEditCustomer }) => {
+const CustomerTable = ({
+  customers = [],
+  onEditCustomer,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
+  statusFilter,
+  onStatusFilterChange,
+  onSearch,
+  typeFilter,
+  onTypeFilterChange,
+  loading,
+}) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({
     key: "name",
     direction: "asc",
   });
-  const [filterType, setFilterType] = useState("all"); // all, cpa, noncpa
+
+  // Debounce search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      onSearch(searchTerm);
+    }, 300); // 300ms delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm, onSearch]);
 
   // Filter and sort customers
   const filteredAndSortedCustomers = useMemo(() => {
     let filtered = customers;
-
-    // Filter by type
-    if (filterType !== "all") {
-      filtered = filtered.filter((customer) =>
-        filterType === "cpa"
-          ? customer.type === "CPA"
-          : customer.type === "NonCPA"
-      );
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (customer) =>
-          customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          customer.surname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          customer.cpaNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
 
     // Sort
     if (sortConfig.key) {
@@ -58,7 +61,7 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
     }
 
     return filtered;
-  }, [customers, searchTerm, sortConfig, filterType]);
+  }, [customers, sortConfig]);
 
   const handleSort = (key) => {
     setSortConfig((prevConfig) => ({
@@ -91,6 +94,23 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
     );
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "New":
+        return "bg-blue-100 text-blue-800";
+      case "Scheduled":
+        return "bg-yellow-100 text-yellow-800";
+      case "Considering":
+        return "bg-purple-100 text-purple-800";
+      case "Lost":
+        return "bg-red-100 text-red-800";
+      case "Customer":
+        return "bg-green-100 text-green-800";
+      default:
+        return "bg-secondary-100 text-secondary-800";
+    }
+  };
+
   return (
     <div className="w-full bg-white rounded-xl shadow-soft">
       {/* Header Controls */}
@@ -108,18 +128,38 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
             />
           </div>
 
-          {/* Type Filter */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-secondary-600" />
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="all">All Customers</option>
-              <option value="cpa">CPA Only</option>
-              <option value="noncpa">NonCPA Only</option>
-            </select>
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Type Filter */}
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-secondary-600" />
+              <select
+                value={typeFilter}
+                onChange={(e) => onTypeFilterChange(e.target.value)}
+                className="px-3 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="all">All Types</option>
+                <option value="CPA">CPA Only</option>
+                <option value="NonCPA">NonCPA Only</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-secondary-600" />
+              <select
+                value={statusFilter}
+                onChange={(e) => onStatusFilterChange(e.target.value)}
+                className="px-3 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="all">All Statuses</option>
+                {CUSTOMER_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Results Count */}
@@ -130,7 +170,12 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center z-10">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary-500"></div>
+          </div>
+        )}
         <table className="w-full">
           <thead className="bg-secondary-50">
             <tr>
@@ -159,6 +204,24 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
                 <div className="flex items-center">
                   CPA Number
                   {getSortIcon("cpaNumber")}
+                </div>
+              </th>
+              <th
+                className="px-6 py-4 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider cursor-pointer hover:bg-secondary-100 transition-colors"
+                onClick={() => handleSort("howNice")}
+              >
+                <div className="flex items-center">
+                  How Nice
+                  {getSortIcon("howNice")}
+                </div>
+              </th>
+              <th
+                className="px-6 py-4 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider cursor-pointer hover:bg-secondary-100 transition-colors"
+                onClick={() => handleSort("status")}
+              >
+                <div className="flex items-center">
+                  Status
+                  {getSortIcon("status")}
                 </div>
               </th>
               <th className="px-6 py-4 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
@@ -219,6 +282,24 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
                   <div className="text-sm text-secondary-900">
                     {customer.cpaNumber || "-"}
                   </div>
+                </td>
+
+                {/* How Nice */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-secondary-900">
+                    {customer.howNice ? `${customer.howNice}/10` : "N/A"}
+                  </div>
+                </td>
+
+                {/* Status */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                      customer.status
+                    )}`}
+                  >
+                    {customer.status || "N/A"}
+                  </span>
                 </td>
 
                 {/* Contact */}
@@ -285,6 +366,19 @@ const CustomerTable = ({ customers = [], onEditCustomer }) => {
               ? "Try adjusting your search terms."
               : "Get started by adding your first customer."}
           </p>
+        </div>
+      )}
+
+      {/* Load More Button */}
+      {hasMore && (
+        <div className="p-6 text-center">
+          <button
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoadingMore ? "Loading..." : "Load More"}
+          </button>
         </div>
       )}
     </div>

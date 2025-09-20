@@ -63,7 +63,8 @@ export const CustomerProvider = ({ children }) => {
   const loadCustomers = async () => {
     try {
       dispatch({ type: "SET_LOADING", payload: true });
-      const customers = await customerService.getAllCustomers();
+      // Note: This context does not currently support pagination, so we just get the customers.
+      const { customers } = await customerService.getAllCustomers();
       dispatch({ type: "SET_CUSTOMERS", payload: customers });
     } catch (error) {
       dispatch({ type: "SET_ERROR", payload: error.message });

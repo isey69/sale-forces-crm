@@ -6,9 +6,11 @@ import {
 } from 'lucide-react';
 import { useCustomer } from '../../hooks/useCustomers';
 import { useCalls } from '../../hooks/useCalls';
-import Modal from '../common/Modal';
+import { useLabels } from '../../hooks/useLabels';
+import Modal, { ConfirmModal } from '../common/Modal';
 import CustomerForm from './CustomerForm';
 import { customerService } from '../../services/customerService';
+import LoadingModal from '../common/LoadingModal';
 
 const CustomerDetail = memo(() => {
   const { customerId } = useParams();
@@ -21,9 +23,13 @@ const CustomerDetail = memo(() => {
     updateCustomer, 
     addRelationship, 
     removeRelationship,
-    updateCustomFields 
+    updateCustomFields,
+    assignLabel,
+    deassignLabel,
   } = useCustomer(customerId);
   
+  const { labels } = useLabels();
+
   const {
     callHistory,
     scheduledCalls,
@@ -33,7 +39,8 @@ const CustomerDetail = memo(() => {
     scheduleCall,
     updateScheduledCall,
     cancelScheduledCall,
-    completeScheduledCall
+    completeScheduledCall,
+    deleteCallHistory,
   } = useCalls(customerId);
   
   const [activeTab, setActiveTab] = useState('overview');
@@ -45,6 +52,12 @@ const CustomerDetail = memo(() => {
   const [relationshipSearchTerm, setRelationshipSearchTerm] = useState('');
   const [relationshipSearchResults, setRelationshipSearchResults] = useState([]);
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
+  const [showDeleteCallModal, setShowDeleteCallModal] = useState(false);
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [callToDelete, setCallToDelete] = useState(null);
+  const [isDeletingCall, setIsDeletingCall] = useState(false);
+  const [isLoggingCall, setIsLoggingCall] = useState(false);
+  const [isSchedulingCall, setIsSchedulingCall] = useState(false);
   const [callFormData, setCallFormData] = useState({
     callType: 'outbound',
     status: 'completed',
@@ -77,12 +90,15 @@ const CustomerDetail = memo(() => {
     setShowEditModal(true);
   }, []);
 
-  const handleSaveCustomer = useCallback(async (customerData) => {
+  const handleSaveCustomer = useCallback(async (customerData, setLoading) => {
     try {
+      setLoading(true);
       await updateCustomer(customerData);
       setShowEditModal(false);
     } catch (error) {
       console.error('Failed to save customer:', error);
+    } finally {
+      setLoading(false);
     }
   }, [updateCustomer]);
 
@@ -181,24 +197,43 @@ const CustomerDetail = memo(() => {
 
   const handleCallFormSubmit = useCallback(async (e) => {
     e.preventDefault();
+    setIsLoggingCall(true);
     try {
-      // If a scheduled call was selected, mark it as complete
       if (callFormData.scheduledCallId) {
-        await completeScheduledCall(callFormData.scheduledCallId, {
+        if (callFormData.status === 'completed') {
+          await completeScheduledCall(callFormData.scheduledCallId, {
+            notes: callFormData.outcome,
+            duration: callFormData.duration,
+          });
+        } else {
+          await addCallToHistory({
+            date: callFormData.date,
+            time: new Date().toLocaleTimeString(),
+            duration: `${callFormData.duration} min`,
+            status: callFormData.status,
+            outcome: callFormData.outcome,
+            callType: callFormData.callType,
+            linkedScheduledCall: callFormData.scheduledCallId,
+          });
+          await cancelScheduledCall(callFormData.scheduledCallId);
+          if (callFormData.status === 'postponed') {
+            setShowScheduleCallModal(true);
+          }
+        }
+      } else {
+        await addCallToHistory({
+          date: callFormData.date,
+          time: new Date().toLocaleTimeString(),
+          duration: `${callFormData.duration} min`,
           status: callFormData.status,
           outcome: callFormData.outcome,
+          callType: callFormData.callType,
+          linkedScheduledCall: null,
         });
+        if (callFormData.status === 'postponed') {
+          setShowScheduleCallModal(true);
+        }
       }
-
-      await addCallToHistory({
-        date: callFormData.date,
-        time: new Date().toLocaleTimeString(),
-        duration: `${callFormData.duration} min`,
-        status: callFormData.status,
-        outcome: callFormData.outcome,
-        callType: callFormData.callType,
-        linkedScheduledCall: callFormData.scheduledCallId || null,
-      });
 
       setShowCallModal(false);
       setCallFormData({
@@ -209,18 +244,16 @@ const CustomerDetail = memo(() => {
         outcome: '',
         scheduledCallId: null,
       });
-
-      // If postponed, open schedule modal
-      if (callFormData.status === 'postponed') {
-        setShowScheduleCallModal(true);
-      }
     } catch (error) {
       console.error('Failed to log call:', error);
+    } finally {
+      setIsLoggingCall(false);
     }
-  }, [callFormData, addCallToHistory, completeScheduledCall]);
+  }, [callFormData, addCallToHistory, completeScheduledCall, cancelScheduledCall]);
 
   const handleScheduleFormSubmit = useCallback(async (e) => {
     e.preventDefault();
+    setIsSchedulingCall(true);
     try {
       await scheduleCall({
         scheduledDate: scheduleFormData.scheduledDate,
@@ -237,6 +270,8 @@ const CustomerDetail = memo(() => {
       });
     } catch (error) {
       console.error('Failed to schedule call:', error);
+    } finally {
+      setIsSchedulingCall(false);
     }
   }, [scheduleFormData, scheduleCall]);
 
@@ -247,6 +282,26 @@ const CustomerDetail = memo(() => {
       console.error('Failed to cancel call:', error);
     }
   }, [cancelScheduledCall]);
+
+  const handleDeleteCall = useCallback((callId) => {
+    setCallToDelete(callId);
+    setShowDeleteCallModal(true);
+  }, []);
+
+  const confirmDeleteCall = useCallback(async () => {
+    if (callToDelete) {
+      setIsDeletingCall(true);
+      try {
+        await deleteCallHistory(callToDelete);
+        setShowDeleteCallModal(false);
+        setCallToDelete(null);
+      } catch (error) {
+        console.error('Failed to delete call:', error);
+      } finally {
+        setIsDeletingCall(false);
+      }
+    }
+  }, [callToDelete, deleteCallHistory]);
 
   // Remove mock data - using Firebase data instead
 
@@ -305,23 +360,7 @@ const CustomerDetail = memo(() => {
 
   // Loading state
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="bg-white rounded-xl p-6">
-              <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-              <div className="space-y-3">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingModal isOpen={true} />;
   }
 
   // Customer not found state
@@ -348,6 +387,7 @@ const CustomerDetail = memo(() => {
   // Main component render
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+      <LoadingModal isOpen={callsLoading} message="Loading calls..." />
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -473,6 +513,73 @@ const CustomerDetail = memo(() => {
                                 <p className="text-gray-900">{customer.customerID || 'N/A'}</p>
                             </div>
                         </div>
+                        <div className="flex items-center gap-3 col-span-2">
+                          <ExternalLink className="w-5 h-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm text-gray-600">Address</p>
+                            <p className="text-gray-900">{customer.address || 'N/A'}</p>
+                          </div>
+                        </div>
+                    </div>
+                  </div>
+
+                  {/* Company Information */}
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                        <Building className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-600">Company Name</p>
+                          <p className="text-gray-900">{customer.companyName || 'N/A'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <ExternalLink className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-600">Company ID</p>
+                          <p className="text-gray-900">{customer.companyId || 'N/A'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 col-span-2">
+                        <ExternalLink className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-600">Company Address</p>
+                          <p className="text-gray-900">{customer.companyAddress || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Labels */}
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Labels</h3>
+                      <button
+                        onClick={() => setShowLabelModal(true)}
+                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Manage Labels
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {customer?.labels?.map((labelId) => {
+                        const label = labels.find((l) => l.id === labelId);
+                        if (!label) return null;
+                        return (
+                          <span
+                            key={label.id}
+                            className="px-3 py-1 text-sm font-medium rounded-full"
+                            style={{ backgroundColor: label.color, color: '#ffffff' }}
+                          >
+                            {label.name}
+                          </span>
+                        );
+                      })}
+                      {(!customer?.labels || customer.labels.length === 0) && (
+                        <p className="text-gray-600">No labels assigned.</p>
+                      )}
                     </div>
                   </div>
 
@@ -622,9 +729,17 @@ const CustomerDetail = memo(() => {
                                   {call.date instanceof Date ? call.date.toLocaleDateString() : call.date} at {call.time} • Duration: {call.duration}
                                 </p>
                               </div>
-                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(call.status)}`}>
-                                {getStatusText(call.status)}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(call.status)}`}>
+                                  {getStatusText(call.status)}
+                                </span>
+                                <button
+                                  onClick={() => handleDeleteCall(call.id)}
+                                  className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
                             {call.outcome && (
                               <div className="mt-2 p-3 bg-white rounded border-l-4 border-blue-500">
@@ -930,6 +1045,16 @@ const CustomerDetail = memo(() => {
             onCancel={() => setShowEditModal(false)}
           />
         </Modal>
+
+        {/* Delete Call Confirmation Modal */}
+        <ConfirmModal
+          isOpen={showDeleteCallModal}
+          onClose={() => setShowDeleteCallModal(false)}
+          onConfirm={confirmDeleteCall}
+          title="Delete Call Log"
+          message="Are you sure you want to delete this call log? This action cannot be undone."
+          loading={isDeletingCall}
+        />
 
         {/* Add Relationship Modal */}
         <Modal
@@ -1266,12 +1391,23 @@ const CustomerDetail = memo(() => {
               <button
                 type="submit"
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={isLoggingCall}
               >
-                Log Call
+                {isLoggingCall ? 'Logging...' : 'Log Call'}
               </button>
             </div>
           </form>
         </Modal>
+
+        {/* Label Assignment Modal */}
+        <LabelAssignmentModal
+          isOpen={showLabelModal}
+          onClose={() => setShowLabelModal(false)}
+          labels={labels}
+          customerLabels={customer?.labels}
+          onAssign={assignLabel}
+          onDeassign={deassignLabel}
+        />
 
         {/* Schedule Call Modal */}
         <Modal
@@ -1341,8 +1477,9 @@ const CustomerDetail = memo(() => {
               <button
                 type="submit"
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                disabled={isSchedulingCall}
               >
-                Schedule Call
+                {isSchedulingCall ? 'Scheduling...' : 'Schedule Call'}
               </button>
             </div>
           </form>
@@ -1351,5 +1488,65 @@ const CustomerDetail = memo(() => {
     </div>
   );
 });
+
+const LabelAssignmentModal = ({
+  isOpen,
+  onClose,
+  labels,
+  customerLabels,
+  onAssign,
+  onDeassign,
+}) => {
+  const navigate = useNavigate();
+  const handleLabelToggle = (labelId, isAssigned) => {
+    if (isAssigned) {
+      onDeassign(labelId);
+    } else {
+      onAssign(labelId);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Manage Labels">
+      <div className="space-y-3">
+        {labels.length > 0 ? (
+          labels.map((label) => {
+            const isAssigned = customerLabels?.includes(label.id);
+            return (
+              <div key={label.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="h-4 w-4 rounded-full"
+                    style={{ backgroundColor: label.color }}
+                  ></span>
+                  <span>{label.name}</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isAssigned}
+                  onChange={() => handleLabelToggle(label.id, isAssigned)}
+                  className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500"
+                />
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-gray-600 mb-4">No labels have been created yet.</p>
+            <button
+              onClick={() => {
+                onClose();
+                navigate('/labels');
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Create a Label
+            </button>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+};
 
 export default CustomerDetail;

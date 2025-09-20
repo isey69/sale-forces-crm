@@ -3,6 +3,7 @@ import { Plus, Upload, Download } from "lucide-react";
 import CustomerTable from "../components/customers/CustomerTable";
 import CustomerForm from "../components/customers/CustomerForm";
 import Modal from "../components/common/Modal";
+import CSVImport from "../components/customers/CSVImport";
 import { useCustomers } from "../hooks/useCustomers";
 import { Toaster } from "react-hot-toast";
 
@@ -13,9 +14,18 @@ const Customers = () => {
     addCustomer,
     updateCustomer,
     importCustomersFromCSV,
+    loadMoreCustomers,
+    hasMore,
+    loadingMore,
+    statusFilter,
+    handleStatusFilterChange,
+    searchCustomers,
+    typeFilter,
+    handleTypeFilterChange,
   } = useCustomers();
 
   const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   const handleAddCustomer = () => {
@@ -43,8 +53,7 @@ const Customers = () => {
   }, [selectedCustomer, addCustomer, updateCustomer]);
 
   const handleImportCSV = () => {
-    // TODO: Implement CSV import functionality
-    console.log("CSV Import clicked");
+    setShowImportModal(true);
   };
 
   const handleExportCSV = () => {
@@ -52,10 +61,10 @@ const Customers = () => {
     console.log("CSV Export clicked");
   };
 
-  if (loading) {
+  if (loading && customers.length === 0) {
     return (
       <div className="min-h-screen bg-secondary-50 p-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full">
           <div className="animate-pulse">
             <div className="h-8 bg-secondary-200 rounded w-1/4 mb-6"></div>
             <div className="bg-white rounded-xl p-6">
@@ -85,7 +94,7 @@ const Customers = () => {
           },
         }}
       />
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -190,6 +199,15 @@ const Customers = () => {
         <CustomerTable
           customers={customers}
           onEditCustomer={handleEditCustomer}
+          onLoadMore={loadMoreCustomers}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          statusFilter={statusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
+          onSearch={searchCustomers}
+          typeFilter={typeFilter}
+          onTypeFilterChange={handleTypeFilterChange}
+          loading={loading}
         />
 
         {/* Customer Form Modal */}
@@ -212,6 +230,16 @@ const Customers = () => {
             />
           </Modal>
         )}
+
+        {/* CSV Import Modal */}
+        <CSVImport
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => {
+            // The useCustomers hook will reload the customers, so we just close the modal
+            setShowImportModal(false);
+          }}
+        />
       </div>
     </div>
   );

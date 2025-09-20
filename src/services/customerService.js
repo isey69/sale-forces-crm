@@ -10,19 +10,39 @@ import {
   orderBy,
   where,
   writeBatch,
+  limit,
+  startAfter,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
 const CUSTOMERS_COLLECTION = "customers";
 const RELATIONSHIPS_COLLECTION = "customer_relationships";
+const PAGE_SIZE = 20;
 
 // Customer CRUD Operations
 export const customerService = {
-  // Get all customers
-  async getAllCustomers() {
+  // Get all customers with pagination and filtering
+  async getAllCustomers(filters = {}) {
+    const { status, type, lastVisible } = filters;
     try {
       const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      const q = query(customersRef, orderBy("createdAt", "desc"));
+      const queryConstraints = [orderBy("createdAt", "desc")];
+
+      if (status && status !== "all") {
+        queryConstraints.push(where("status", "==", status));
+      }
+
+      if (type && type !== "all") {
+        queryConstraints.push(where("type", "==", type));
+      }
+
+      if (lastVisible) {
+        queryConstraints.push(startAfter(lastVisible));
+      }
+
+      queryConstraints.push(limit(PAGE_SIZE));
+
+      const q = query(customersRef, ...queryConstraints);
       const querySnapshot = await getDocs(q);
 
       const customers = [];
@@ -36,43 +56,14 @@ export const customerService = {
         });
       });
 
-      return customers;
+      const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+      return { customers, lastVisible: lastDoc };
     } catch (error) {
       console.error("Error fetching customers:", error);
       throw error;
     }
   },
 
-  // More efficient search for relationship adding
-  async searchCustomersByName(name) {
-    if (!name) return [];
-    try {
-      const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      const searchLower = name.toLowerCase();
-      const q = query(
-        customersRef,
-        where('name_lowercase', '>=', searchLower),
-        where('name_lowercase', '<=', searchLower + '\uf8ff'),
-        orderBy('name_lowercase'),
-      );
-
-      const querySnapshot = await getDocs(q);
-      const customers = [];
-      querySnapshot.forEach((doc) => {
-        customers.push({ id: doc.id, ...doc.data() });
-      });
-      return customers;
-    } catch (error) {
-      console.error("Error searching customers by name:", error);
-      // It's likely the composite index is missing. Log a helpful message.
-      if (error.code === 'failed-precondition') {
-        console.error(
-          "Firestore index not found. Please create a composite index on 'customers' collection for 'name_lowercase' ascending."
-        );
-      }
-      throw error;
-    }
-  },
 
   // Get customer by ID
   async getCustomerById(customerId) {
@@ -104,7 +95,6 @@ export const customerService = {
       const customersRef = collection(db, CUSTOMERS_COLLECTION);
       const newCustomer = {
         ...customerData,
-        name_lowercase: customerData.name.toLowerCase(),
         createdAt: new Date(),
         lastActivity: new Date(),
         relationships: [],
@@ -127,10 +117,6 @@ export const customerService = {
         ...updates,
         lastActivity: new Date(),
       };
-
-      if (updates.name) {
-        updateData.name_lowercase = updates.name.toLowerCase();
-      }
 
       await updateDoc(customerRef, updateData);
       return { id: customerId, ...updateData };
@@ -156,50 +142,38 @@ export const customerService = {
     }
   },
 
-  // Get customers by type
-  async getCustomersByType(type) {
+  // Private helper to fetch all customers without pagination
+  async _fetchAllCustomers() {
     try {
       const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      const q = query(
-        customersRef,
-        where("type", "==", type),
-        orderBy("createdAt", "desc")
-      );
+      const q = query(customersRef, orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
-
       const customers = [];
       querySnapshot.forEach((doc) => {
-        customers.push({
-          id: doc.id,
-          ...doc.data(),
-        });
+        customers.push({ id: doc.id, ...doc.data() });
       });
-
       return customers;
     } catch (error) {
-      console.error("Error fetching customers by type:", error);
+      console.error("Error fetching all customers:", error);
       throw error;
     }
   },
 
-  // Search customers
+  // Search customers (client-side)
   async searchCustomers(searchTerm) {
-    try {
-      const customers = await this.getAllCustomers();
+    if (!searchTerm) return [];
+    const searchLower = searchTerm.toLowerCase();
 
-      const filtered = customers.filter((customer) => {
-        const searchLower = searchTerm.toLowerCase();
+    try {
+      const allCustomers = await this._fetchAllCustomers();
+      const filtered = allCustomers.filter((customer) => {
         return (
           customer.name?.toLowerCase().includes(searchLower) ||
           customer.surname?.toLowerCase().includes(searchLower) ||
           customer.email?.toLowerCase().includes(searchLower) ||
-          customer.cpaNumber?.toLowerCase().includes(searchLower) ||
-          `${customer.name} ${customer.surname}`
-            .toLowerCase()
-            .includes(searchLower)
+          customer.cpaNumber?.toLowerCase().includes(searchLower)
         );
       });
-
       return filtered;
     } catch (error) {
       console.error("Error searching customers:", error);
@@ -352,21 +326,58 @@ export const customerService = {
 
   // CSV Import helper
   async importCustomersFromCSV(customersData) {
-    try {
-      const batch = writeBatch(db);
-      const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      const results = [];
+    if (!customersData || customersData.length === 0) {
+      return { imported: [], duplicates: [], errors: [] };
+    }
 
-      for (const customerData of customersData) {
-        // Check for duplicates (by email or cpaNumber)
-        const existing = await this.findDuplicateCustomer(customerData);
-        if (existing) {
-          results.push({
-            status: "skipped",
-            data: customerData,
-            reason: "Duplicate found",
+    try {
+      const customersRef = collection(db, CUSTOMERS_COLLECTION);
+
+      // 1. Get all emails and cpaNumbers from the import data
+      const emailsToCkeck = customersData
+        .map((c) => c.email)
+        .filter(Boolean);
+      const cpaNumbersToCheck = customersData
+        .map((c) => c.cpaNumber)
+        .filter(Boolean);
+
+      // 2. Batch query for existing customers
+      const existingEmails = new Set();
+      const existingCpaNumbers = new Set();
+
+      const queryBy = async (field, values) => {
+        if (values.length === 0) return;
+        // Firestore 'in' query supports up to 10 elements
+        for (let i = 0; i < values.length; i += 10) {
+          const chunk = values.slice(i, i + 10);
+          const q = query(customersRef, where(field, "in", chunk));
+          const snapshot = await getDocs(q);
+          snapshot.forEach((doc) => {
+            if (field === "email") existingEmails.add(doc.data().email);
+            if (field === "cpaNumber")
+              existingCpaNumbers.add(doc.data().cpaNumber);
           });
-          continue;
+        }
+      };
+
+      await Promise.all([
+        queryBy("email", emailsToCkeck),
+        queryBy("cpaNumber", cpaNumbersToCheck),
+      ]);
+
+      // 3. Process and batch write
+      const batch = writeBatch(db);
+      const results = { imported: [], duplicates: [], errors: [] };
+
+      customersData.forEach((customerData) => {
+        const isDuplicate =
+          (customerData.email && existingEmails.has(customerData.email)) ||
+          (customerData.cpaNumber &&
+            existingCpaNumbers.has(customerData.cpaNumber));
+
+        if (isDuplicate) {
+          results.duplicates.push({ data: customerData });
+          return;
         }
 
         const newCustomerRef = doc(customersRef);
@@ -378,14 +389,9 @@ export const customerService = {
           relationships: [],
           customFields: {},
         };
-
         batch.set(newCustomerRef, newCustomer);
-        results.push({
-          status: "imported",
-          data: customerData,
-          id: newCustomerRef.id,
-        });
-      }
+        results.imported.push({ data: customerData, id: newCustomerRef.id });
+      });
 
       await batch.commit();
       return results;
@@ -395,34 +401,46 @@ export const customerService = {
     }
   },
 
-  // Find duplicate customer
-  async findDuplicateCustomer(customerData) {
+  // Assign a label to a customer
+  async assignLabelToCustomer(customerId, labelId) {
     try {
-      const customersRef = collection(db, CUSTOMERS_COLLECTION);
-      let q;
-
-      if (customerData.email) {
-        q = query(customersRef, where("email", "==", customerData.email));
-        const emailSnapshot = await getDocs(q);
-        if (!emailSnapshot.empty) {
-          return emailSnapshot.docs[0].data();
-        }
+      const customerRef = doc(db, CUSTOMERS_COLLECTION, customerId);
+      const customerDoc = await getDoc(customerRef);
+      if (!customerDoc.exists()) {
+        throw new Error("Customer not found");
       }
-
-      if (customerData.cpaNumber) {
-        q = query(
-          customersRef,
-          where("cpaNumber", "==", customerData.cpaNumber)
-        );
-        const cpaSnapshot = await getDocs(q);
-        if (!cpaSnapshot.empty) {
-          return cpaSnapshot.docs[0].data();
-        }
+      const customerData = customerDoc.data();
+      const labels = customerData.labels || [];
+      if (!labels.includes(labelId)) {
+        await updateDoc(customerRef, {
+          labels: [...labels, labelId],
+        });
       }
-
-      return null;
+      return true;
     } catch (error) {
-      console.error("Error checking for duplicates:", error);
+      console.error("Error assigning label to customer:", error);
+      throw error;
+    }
+  },
+
+  // De-assign a label from a customer
+  async deassignLabelFromCustomer(customerId, labelId) {
+    try {
+      const customerRef = doc(db, CUSTOMERS_COLLECTION, customerId);
+      const customerDoc = await getDoc(customerRef);
+      if (!customerDoc.exists()) {
+        throw new Error("Customer not found");
+      }
+      const customerData = customerDoc.data();
+      const labels = customerData.labels || [];
+      if (labels.includes(labelId)) {
+        await updateDoc(customerRef, {
+          labels: labels.filter((id) => id !== labelId),
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error("Error de-assigning label from customer:", error);
       throw error;
     }
   },

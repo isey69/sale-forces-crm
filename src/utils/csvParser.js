@@ -17,8 +17,8 @@ export const parseCSV = (csvText, customerType = "CPA") => {
     // Validate required headers
     const requiredHeaders =
       customerType === "CPA"
-        ? ["cpanumber", "title", "name", "surname"]
-        : ["title", "name", "surname"];
+        ? ["cpanumber", "name", "surname"]
+        : ["name", "surname"];
 
     const missingRequired = requiredHeaders.filter(
       (req) => !headers.includes(req)
@@ -73,8 +73,29 @@ export const parseCSV = (csvText, customerType = "CPA") => {
             case "phone":
               customer.phone = value || null;
               break;
+            case "lineid":
+              customer.lineID = value || null;
+              break;
+            case "customerid":
+              customer.customerID = value || null;
+              break;
+            case "hownice":
+              customer.howNice = value ? parseInt(value, 10) : null;
+              break;
+            case "address":
+              customer.address = value || null;
+              break;
+            case "companyname":
+              customer.companyName = value || null;
+              break;
+            case "companyid":
+              customer.companyId = value || null;
+              break;
+            case "companyaddress":
+              customer.companyAddress = value || null;
+              break;
             default:
-              // Handle custom fields
+              // Handle any other fields as custom fields
               if (value) {
                 customer.customFields = customer.customFields || {};
                 customer.customFields[header] = value;
@@ -147,10 +168,6 @@ const validateCustomerData = (customer) => {
   const errors = [];
 
   // Required field validation
-  if (!customer.title?.trim()) {
-    errors.push("Title is required");
-  }
-
   if (!customer.name?.trim()) {
     errors.push("Name is required");
   }
@@ -185,30 +202,71 @@ const isValidEmail = (email) => {
 
 // Phone validation (basic format check)
 const isValidPhone = (phone) => {
-  // Remove all non-digit characters
-  const cleanPhone = phone.replace(/\D/g, "");
-  // Check if it's between 10-15 digits
-  return cleanPhone.length >= 10 && cleanPhone.length <= 15;
+  if (!phone) return false;
+  // Count the number of digits in the string
+  const digitCount = (phone.match(/\d/g) || []).length;
+  // Check if it's between 9 and 15 digits
+  return digitCount >= 9 && digitCount <= 15;
 };
 
 // Generate CSV template
 export const generateCSVTemplate = (customerType = "CPA") => {
+  const allFields = [
+    "type",
+    "cpaNumber",
+    "title",
+    "name",
+    "surname",
+    "email",
+    "phone",
+    "lineID",
+    "customerID",
+    "howNice",
+    "address",
+    "companyName",
+    "companyId",
+    "companyAddress",
+  ];
+
   const headers =
     customerType === "CPA"
-      ? ["cpaNumber", "title", "name", "surname", "email", "phone"]
-      : ["title", "name", "surname", "email", "phone"];
+      ? allFields
+      : allFields.filter((field) => field !== "cpaNumber");
 
   const sampleData =
     customerType === "CPA"
       ? [
+          "CPA",
           "CPA123456",
           "Mr.",
           "John",
           "Smith",
           "john.smith@example.com",
           "+1234567890",
+          "john.smith",
+          "CUST001",
+          "8",
+          "123 Main St, Anytown, USA",
+          "Smith & Co.",
+          "COMP001",
+          "456 Business Rd, Anytown, USA",
         ]
-      : ["Ms.", "Jane", "Doe", "jane.doe@example.com", "+1234567891"];
+      : [
+          "NonCPA",
+          "",
+          "Ms.",
+          "Jane",
+          "Doe",
+          "jane.doe@example.com",
+          "+1234567891",
+          "jane.doe",
+          "CUST002",
+          "9",
+          "789 Oak Ave, Anytown, USA",
+          "Doe Industries",
+          "COMP002",
+          "101 Enterprise Way, Anytown, USA",
+        ];
 
   return `${headers.join(",")}\n${sampleData.join(",")}`;
 };
@@ -216,7 +274,7 @@ export const generateCSVTemplate = (customerType = "CPA") => {
 // Download CSV template
 export const downloadCSVTemplate = (customerType = "CPA") => {
   const csvContent = generateCSVTemplate(customerType);
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
 
   if (link.download !== undefined) {
@@ -303,7 +361,7 @@ export const exportCustomersToCSV = (customers, filename = "customers.csv") => {
   });
 
   const csvContent = csvRows.join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
 
   if (link.download !== undefined) {
