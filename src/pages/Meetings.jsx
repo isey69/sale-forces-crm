@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useMeetings } from "../context/MeetingContext";
 import { callService } from "../services/callService";
+import { customerService } from "../services/customerService";
 import MeetingCard from "../components/meetings/MeetingCard";
 import MeetingForm from "../components/meetings/MeetingForm";
+import LogCallModal from '../components/meetings/LogCallModal';
 import Button from "../components/common/Button";
 import Input, { Select } from "../components/common/Input";
 import Modal from "../components/common/Modal";
@@ -30,6 +32,8 @@ const Meetings = () => {
   // Call scheduling state
   const [scheduledCalls, setScheduledCalls] = useState([]);
   const [callsLoading, setCallsLoading] = useState(false);
+  const [customerData, setCustomerData] = useState({});
+  const [customersLoading, setCustomersLoading] = useState(false);
   const [showScheduleCallModal, setShowScheduleCallModal] = useState(false);
   const [scheduleCallFormData, setScheduleCallFormData] = useState({
     customerId: '',
@@ -38,6 +42,17 @@ const Meetings = () => {
     priority: 'medium',
     purpose: ''
   });
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [selectedCall, setSelectedCall] = useState(null);
+
+  const handleOpenLogModal = (call) => {
+    setSelectedCall(call);
+    setIsLogModalOpen(true);
+  };
+
+  const handleLogSuccess = () => {
+    loadScheduledCalls();
+  };
 
   // Load scheduled calls
   const loadScheduledCalls = async () => {
@@ -57,6 +72,32 @@ const Meetings = () => {
   useEffect(() => {
     loadScheduledCalls();
   }, []);
+
+  useEffect(() => {
+    const fetchCustomerData = async () => {
+      if (scheduledCalls.length === 0) return;
+
+      setCustomersLoading(true);
+      const customerIds = [...new Set(scheduledCalls.map(c => c.customerId))];
+      const customerPromises = customerIds.map(id => customerService.getCustomerById(id));
+
+      try {
+        const customers = await Promise.all(customerPromises);
+        const customerMap = customers.reduce((acc, customer) => {
+          acc[customer.id] = customer;
+          return acc;
+        }, {});
+        setCustomerData(customerMap);
+      } catch (error) {
+        console.error('Error fetching customer data:', error);
+        toast.error('Failed to load customer details for calls');
+      } finally {
+        setCustomersLoading(false);
+      }
+    };
+
+    fetchCustomerData();
+  }, [scheduledCalls]);
 
   // Filter options
   const statusOptions = [
@@ -194,7 +235,7 @@ const Meetings = () => {
   };
 
   const getFilteredCalls = () => {
-    let filtered = [...scheduledCalls];
+    let filtered = scheduledCalls.filter(call => call.status === 'scheduled');
     
     // Apply date range filter
     if (filters.dateRange === 'today') {
@@ -214,8 +255,8 @@ const Meetings = () => {
     // Apply search filter
     if (filters.search) {
       filtered = filtered.filter(call =>
-        call.purpose?.toLowerCase().includes(filters.search.toLowerCase()) ||
-        call.customerId?.toLowerCase().includes(filters.search.toLowerCase())
+        (customerData[call.customerId]?.name.toLowerCase().includes(filters.search.toLowerCase())) ||
+        (call.purpose?.toLowerCase().includes(filters.search.toLowerCase()))
       );
     }
 
@@ -241,7 +282,7 @@ const Meetings = () => {
   const upcomingMeetings = getUpcomingMeetings();
   const filteredCalls = getFilteredCalls();
 
-  if (meetingsLoading || callsLoading) {
+  if (meetingsLoading || callsLoading || customersLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -468,11 +509,13 @@ const Meetings = () => {
               />
             </div>
 
-            <Select
-              value={filters.status}
-              onChange={handleStatusFilter}
-              options={statusOptions}
-            />
+            {activeTab !== 'calls' && (
+              <Select
+                value={filters.status}
+                onChange={handleStatusFilter}
+                options={statusOptions}
+              />
+            )}
 
             <Select
               value={filters.category}
@@ -572,37 +615,52 @@ const Meetings = () => {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-gray-900">Scheduled Calls</h2>
           {filteredCalls.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {filteredCalls.map((call) => (
-                <div key={call.id} className="bg-white rounded-lg shadow-card p-4 border border-gray-200">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-5 h-5 text-green-600" />
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{call.purpose}</h3>
-                        <p className="text-sm text-gray-600">
-                          {formatDate(call.scheduledDate)} at {formatTime(call.scheduledTime)}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(call.priority)}`}>
-                      {call.priority} priority
-                    </span>
-                  </div>
-                  
-                  <div className="flex justify-end gap-2">
-                    <button className="px-3 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors">
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleCancelCall(call.id)}
-                      className="px-3 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="bg-white rounded-lg shadow-card border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purpose</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th scope="col" className="relative px-6 py-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredCalls.map((call) => (
+                    <tr key={call.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {customerData[call.customerId]?.name || 'Loading...'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {customerData[call.customerId]?.email || ''}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">{call.purpose}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{formatDate(call.scheduledDate)}</div>
+                        <div className="text-sm text-gray-500">{formatTime(call.scheduledTime)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(call.priority)}`}>
+                          {call.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => handleOpenLogModal(call)} className="text-indigo-600 hover:text-indigo-900 mr-4">Log Call</button>
+                        {/* Edit functionality for calls is not implemented yet. */}
+                        <button className="text-gray-400 hover:text-gray-600 mr-4" disabled>Edit</button>
+                        <button onClick={() => handleCancelCall(call.id)} className="text-red-600 hover:text-red-900">Cancel</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div className="text-center py-12">
@@ -613,7 +671,14 @@ const Meetings = () => {
         </div>
       )}
 
-      {/* Schedule Call Modal */}
+      {/* Modals */}
+      <LogCallModal
+        isOpen={isLogModalOpen}
+        onClose={() => setIsLogModalOpen(false)}
+        call={selectedCall}
+        onSuccess={handleLogSuccess}
+      />
+
       <Modal
         isOpen={showScheduleCallModal}
         onClose={() => setShowScheduleCallModal(false)}
