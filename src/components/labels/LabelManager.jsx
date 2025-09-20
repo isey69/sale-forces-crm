@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { useLabels } from '../../hooks/useLabels';
-import { Plus, Edit, Trash2, Tag } from 'lucide-react';
-import Modal from '../common/Modal';
-import { ConfirmModal } from '../common/Modal';
+import React, { useState } from "react";
+import { useLabels } from "../../hooks/useLabels";
+import { Plus, Edit, Trash2 } from "lucide-react";
+import Modal from "../common/Modal";
+import { ConfirmModal } from "../common/Modal";
 
 const LabelManager = () => {
   const { labels, addLabel, updateLabel, deleteLabel, loading } = useLabels();
@@ -69,13 +69,18 @@ const LabelManager = () => {
           <div className="bg-white rounded-xl shadow-md">
             <ul className="divide-y divide-gray-200">
               {labels.map((label) => (
-                <li key={label.id} className="flex items-center justify-between p-4">
+                <li
+                  key={label.id}
+                  className="flex items-center justify-between p-4"
+                >
                   <div className="flex items-center gap-3">
                     <span
                       className="h-4 w-4 rounded-full"
                       style={{ backgroundColor: label.color }}
                     ></span>
-                    <span className="font-medium text-gray-800">{label.name}</span>
+                    <span className="font-medium text-gray-800">
+                      {label.name}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -120,8 +125,8 @@ const LabelManager = () => {
 };
 
 const LabelFormModal = ({ isOpen, onClose, onSave, label }) => {
-  const [name, setName] = useState(label?.name || '');
-  const [color, setColor] = useState(label?.color || '#cccccc');
+  const [name, setName] = useState(label?.name || "");
+  const [color, setColor] = useState(label?.color || "#cccccc");
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -135,16 +140,34 @@ const LabelFormModal = ({ isOpen, onClose, onSave, label }) => {
   };
 
   const colors = [
-    '#f87171', '#fb923c', '#facc15', '#a3e635', '#4ade80',
-    '#34d399', '#2dd4bf', '#22d3ee', '#38bdf8', '#60a5fa',
-    '#818cf8', '#a78bfa', '#c084fc', '#f472b6', '#fb7185'
+    "#f87171",
+    "#fb923c",
+    "#facc15",
+    "#a3e635",
+    "#4ade80",
+    "#34d399",
+    "#2dd4bf",
+    "#22d3ee",
+    "#38bdf8",
+    "#60a5fa",
+    "#818cf8",
+    "#a78bfa",
+    "#c084fc",
+    "#f472b6",
+    "#fb7185",
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={label ? 'Edit Label' : 'Add Label'}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={label ? "Edit Label" : "Add Label"}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Label Name</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Label Name
+          </label>
           <input
             type="text"
             value={name}
@@ -154,7 +177,9 @@ const LabelFormModal = ({ isOpen, onClose, onSave, label }) => {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Color</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Color
+          </label>
           <div className="mt-2 flex flex-wrap gap-2">
             {colors.map((c) => (
               <button
@@ -162,7 +187,9 @@ const LabelFormModal = ({ isOpen, onClose, onSave, label }) => {
                 type="button"
                 onClick={() => setColor(c)}
                 className={`w-8 h-8 rounded-full border-2 ${
-                  color === c ? 'border-blue-500 ring-2 ring-blue-200' : 'border-transparent'
+                  color === c
+                    ? "border-blue-500 ring-2 ring-blue-200"
+                    : "border-transparent"
                 }`}
                 style={{ backgroundColor: c }}
               />
@@ -189,7 +216,7 @@ const LabelFormModal = ({ isOpen, onClose, onSave, label }) => {
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             disabled={isSaving}
           >
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? "Saving..." : "Save"}
           </button>
         </div>
       </form>

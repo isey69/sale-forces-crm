@@ -180,7 +180,7 @@ export const CustomFieldsProvider = ({ children }) => {
         break;
 
       case "phone":
-        const phoneRegex = /^[+]?[\d\s\-\(\)]{10,}$/;
+        const phoneRegex = /^[+]?[\d\s\-()]{10,}$/;
         if (!phoneRegex.test(value)) {
           errors.push(`${field.label} must be a valid phone number`);
         }
@@ -243,6 +243,10 @@ export const CustomFieldsProvider = ({ children }) => {
         if (isNaN(dateValue.getTime())) {
           errors.push(`${field.label} must be a valid date`);
         }
+        break;
+
+      default:
+        // No validation for unknown field types
         break;
     }
 
