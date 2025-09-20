@@ -78,10 +78,14 @@ const Meetings = () => {
       if (scheduledCalls.length === 0) return;
 
       setCustomersLoading(true);
-      const customerIds = [...new Set(scheduledCalls.map(c => c.customerId))];
-      const customerPromises = customerIds.map(id => customerService.getCustomerById(id));
+      const customerIds = [...new Set(scheduledCalls.map(c => c.customerId).filter(Boolean))];
+      if (customerIds.length === 0) {
+        setCustomersLoading(false);
+        return;
+      }
 
       try {
+        const customerPromises = customerIds.map(id => customerService.getCustomerById(id));
         const customers = await Promise.all(customerPromises);
         const customerMap = customers.reduce((acc, customer) => {
           acc[customer.id] = customer;
@@ -509,13 +513,11 @@ const Meetings = () => {
               />
             </div>
 
-            {activeTab !== 'calls' && (
-              <Select
-                value={filters.status}
-                onChange={handleStatusFilter}
-                options={statusOptions}
-              />
-            )}
+            <Select
+              value={filters.status}
+              onChange={handleStatusFilter}
+              options={statusOptions}
+            />
 
             <Select
               value={filters.category}
@@ -537,48 +539,65 @@ const Meetings = () => {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-gray-900">All Appointments</h2>
           {getCombinedAppointments().length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {getCombinedAppointments().map((appointment) => (
-                <div key={`${appointment.type}-${appointment.id}`} className="bg-white rounded-lg shadow-card p-4 border border-gray-200">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      {appointment.type === 'meeting' ? (
-                        <Users className="w-5 h-5 text-blue-600" />
-                      ) : (
-                        <Phone className="w-5 h-5 text-green-600" />
-                      )}
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
-                          {appointment.title || appointment.purpose}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          {formatDate(appointment.date || appointment.scheduledDate)} at {
-                            formatTime(appointment.startTime || appointment.scheduledTime)
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      appointment.type === 'meeting' 
-                        ? 'bg-blue-100 text-blue-800'
-                        : getPriorityColor(appointment.priority)
-                    }`}>
-                      {appointment.type === 'meeting' ? appointment.category : `${appointment.priority} priority`}
-                    </span>
-                  </div>
-                  
-                  {appointment.type === 'call' && (
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => handleCancelCall(appointment.id)}
-                        className="px-3 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="bg-white rounded-lg shadow-card border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title/Purpose</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer/Category</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status/Priority</th>
+                    <th scope="col" className="relative px-6 py-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {getCombinedAppointments().map((appointment) => (
+                    <tr key={`${appointment.type}-${appointment.id}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          appointment.type === 'meeting' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                        }`}>
+                          {appointment.type === 'meeting' ? <Users className="w-4 h-4 mr-1.5" /> : <Phone className="w-4 h-4 mr-1.5" />}
+                          {appointment.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">{appointment.title || appointment.purpose}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {appointment.type === 'meeting' ? appointment.category : (customerData[appointment.customerId]?.name || 'Loading...')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{formatDate(appointment.date || appointment.scheduledDate)}</div>
+                        <div className="text-sm text-gray-500">{formatTime(appointment.startTime || appointment.scheduledTime)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          appointment.type === 'meeting' ? 'bg-yellow-100 text-yellow-800' : getPriorityColor(appointment.priority)
+                        }`}>
+                          {appointment.type === 'meeting' ? appointment.status : appointment.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {appointment.type === 'meeting' ? (
+                          <button onClick={() => handleEditMeeting(appointment)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
+                        ) : (
+                          <>
+                            <button onClick={() => handleOpenLogModal(appointment)} className="text-indigo-600 hover:text-indigo-900 mr-4">Log Call</button>
+                            <button className="text-gray-400 hover:text-gray-600 mr-4" disabled>Edit</button>
+                            <button onClick={() => handleCancelCall(appointment.id)} className="text-red-600 hover:text-red-900">Cancel</button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div className="text-center py-12">
@@ -593,14 +612,44 @@ const Meetings = () => {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-gray-900">Meetings</h2>
           {filteredMeetings.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {filteredMeetings.map((meeting) => (
-                <MeetingCard
-                  key={meeting.id}
-                  meeting={meeting}
-                  onEdit={handleEditMeeting}
-                />
-              ))}
+            <div className="bg-white rounded-lg shadow-card border border-gray-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" className="relative px-6 py-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredMeetings.map((meeting) => (
+                    <tr key={meeting.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{meeting.title}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">{meeting.category}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{formatDate(meeting.date)}</div>
+                        <div className="text-sm text-gray-500">{formatTime(meeting.startTime)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800`}>
+                          {meeting.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => handleEditMeeting(meeting)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div className="text-center py-12">
@@ -653,7 +702,6 @@ const Meetings = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button onClick={() => handleOpenLogModal(call)} className="text-indigo-600 hover:text-indigo-900 mr-4">Log Call</button>
-                        {/* Edit functionality for calls is not implemented yet. */}
                         <button className="text-gray-400 hover:text-gray-600 mr-4" disabled>Edit</button>
                         <button onClick={() => handleCancelCall(call.id)} className="text-red-600 hover:text-red-900">Cancel</button>
                       </td>
@@ -678,7 +726,6 @@ const Meetings = () => {
         call={selectedCall}
         onSuccess={handleLogSuccess}
       />
-
       <Modal
         isOpen={showScheduleCallModal}
         onClose={() => setShowScheduleCallModal(false)}

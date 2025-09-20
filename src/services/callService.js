@@ -1,7 +1,8 @@
 import { 
   collection, 
   doc, 
-  getDocs, 
+  getDocs,
+  getDoc,
   addDoc, 
   updateDoc, 
   deleteDoc, 
@@ -10,6 +11,7 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { parse } from 'date-fns';
 
 const CALL_HISTORY_COLLECTION = 'call_history';
 const SCHEDULED_CALLS_COLLECTION = 'scheduled_calls';
@@ -226,24 +228,24 @@ export const callService = {
   async completeScheduledCall(scheduledCallId, callOutcome) {
     try {
       // Get the scheduled call
-      const scheduledCallsRef = collection(db, SCHEDULED_CALLS_COLLECTION);
-      const scheduledCallQuery = query(
-        scheduledCallsRef,
-        where('__name__', '==', scheduledCallId)
-      );
-      const scheduledSnapshot = await getDocs(scheduledCallQuery);
+      const callRef = doc(db, SCHEDULED_CALLS_COLLECTION, scheduledCallId);
+      const callDoc = await getDoc(callRef);
       
-      if (scheduledSnapshot.empty) {
+      if (!callDoc.exists()) {
         throw new Error('Scheduled call not found');
       }
 
-      const scheduledCall = scheduledSnapshot.docs[0].data();
+      const scheduledCall = callDoc.data();
       
+      const callDate = callOutcome.date && callOutcome.time
+        ? parse(`${callOutcome.date} ${callOutcome.time}`, 'yyyy-MM-dd HH:mm', new Date())
+        : new Date();
+
       // Create call history entry
       const callHistoryData = {
         customerId: scheduledCall.customerId,
-        date: new Date(),
-        time: new Date().toLocaleTimeString(),
+        date: callDate,
+        time: callDate.toLocaleTimeString(),
         duration: callOutcome.duration || 0,
         status: 'completed',
         outcome: callOutcome.notes || '',
