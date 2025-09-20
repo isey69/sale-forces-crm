@@ -7,6 +7,7 @@ import {
 import { useCustomer } from '../../hooks/useCustomers';
 import { useCalls } from '../../hooks/useCalls';
 import { useLabels } from '../../hooks/useLabels';
+import { useCustomFields } from '../../context/CustomFieldsContext';
 import Modal, { ConfirmModal } from '../common/Modal';
 import CustomerForm from './CustomerForm';
 import { customerService } from '../../services/customerService';
@@ -29,6 +30,7 @@ const CustomerDetail = memo(() => {
   } = useCustomer(customerId);
   
   const { labels } = useLabels();
+  const { customFields, loading: customFieldsLoading } = useCustomFields();
 
   const {
     callHistory,
@@ -383,6 +385,10 @@ const CustomerDetail = memo(() => {
     );
   }
 
+  const applicableCustomFields = customFields.filter(field =>
+    field.appliesTo.includes(customer.type)
+  );
+
   // Main component render
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -519,6 +525,15 @@ const CustomerDetail = memo(() => {
                             <p className="text-gray-900">{customer.address || 'N/A'}</p>
                           </div>
                         </div>
+                      {applicableCustomFields.map((field) => (
+                        <div key={field.id} className="flex items-center gap-3">
+                          <ExternalLink className="w-5 h-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm text-gray-600">{field.label}</p>
+                            <p className="text-gray-900">{customer.customFields?.[field.name] || 'N/A'}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -628,35 +643,6 @@ const CustomerDetail = memo(() => {
                     </div>
                   </div>
 
-                  {/* Custom Fields */}
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">Custom Fields</h3>
-                      <button
-                        onClick={handleAddCustomField}
-                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Field
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {customer?.customFields && Object.keys(customer.customFields).length > 0 ? (
-                        Object.entries(customer.customFields).map(([key, value]) => (
-                          <div key={key} className="bg-gray-50 rounded-lg p-4">
-                            <p className="text-sm text-gray-600 mb-1 capitalize">
-                              {key.replace('_', ' ')}
-                            </p>
-                            <p className="text-gray-900 font-medium">{value}</p>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="col-span-2 bg-gray-50 rounded-lg p-6">
-                          <p className="text-gray-600 text-center">No custom fields added yet</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
 
                 {/* Activity Summary */}
