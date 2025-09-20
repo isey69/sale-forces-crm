@@ -348,8 +348,7 @@ const CustomerDetail = memo(() => {
     { key: 'overview', label: 'Overview', icon: Users },
     { key: 'calls', label: 'Call History', icon: Phone },
     { key: 'appointments', label: 'Appointments', icon: Calendar },
-    { key: 'notes', label: 'Notes', icon: FileText },
-    { key: 'custom', label: 'Custom Fields', icon: Settings }
+    { key: 'notes', label: 'Notes', icon: FileText }
   ];
 
   const getTypeIcon = (type) => {
@@ -624,6 +623,36 @@ const CustomerDetail = memo(() => {
                       ) : (
                         <div className="text-center py-4 text-gray-600">
                           No relationships found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Custom Fields */}
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Custom Fields</h3>
+                      <button
+                        onClick={handleAddCustomField}
+                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Field
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {customer?.customFields && Object.keys(customer.customFields).length > 0 ? (
+                        Object.entries(customer.customFields).map(([key, value]) => (
+                          <div key={key} className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-sm text-gray-600 mb-1 capitalize">
+                              {key.replace('_', ' ')}
+                            </p>
+                            <p className="text-gray-900 font-medium">{value}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-2 bg-gray-50 rounded-lg p-6">
+                          <p className="text-gray-600 text-center">No custom fields added yet</p>
                         </div>
                       )}
                     </div>
@@ -994,38 +1023,6 @@ const CustomerDetail = memo(() => {
                   <div className="bg-gray-50 rounded-lg p-6">
                     <p className="text-gray-600 text-center">No notes available</p>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Custom Fields Tab */}
-            {activeTab === 'custom' && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Custom Fields</h3>
-                  <button 
-                    onClick={handleAddCustomField}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Field
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {customer?.customFields && Object.keys(customer.customFields).length > 0 ? (
-                    Object.entries(customer.customFields).map(([key, value]) => (
-                      <div key={key} className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-sm text-gray-600 mb-1 capitalize">
-                          {key.replace('_', ' ')}
-                        </p>
-                        <p className="text-gray-900 font-medium">{value}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="col-span-2 bg-gray-50 rounded-lg p-6">
-                      <p className="text-gray-600 text-center">No custom fields added yet</p>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
